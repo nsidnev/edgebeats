@@ -1,5 +1,6 @@
 defmodule LiveBeatsWeb.LayoutView do
   use LiveBeatsWeb, :view
+  use Phoenix.Component
 
   alias LiveBeatsWeb.Endpoint
 
@@ -91,8 +92,8 @@ defmodule LiveBeatsWeb.LayoutView do
 
   def sidebar_account_dropdown(assigns) do
     ~H"""
-    <.dropdown id={@id}>
-      <:img src={@current_user.avatar_url} />
+    <.dropdown id={@id} foo="bar">
+      <:img src={@current_user.avatar_url}/>
       <:title><%= @current_user.name %></:title>
       <:subtitle>@<%= @current_user.username %></:subtitle>
       <:link navigate={profile_path(@current_user)}>View Profile</:link>

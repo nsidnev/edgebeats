@@ -1,6 +1,5 @@
 defmodule LiveBeatsWeb.LiveHelpers do
-  import Phoenix.LiveView
-  import Phoenix.LiveView.Helpers
+  use Phoenix.Component
 
   alias LiveBeatsWeb.Router.Helpers, as: Routes
   alias Phoenix.LiveView.JS
@@ -62,6 +61,8 @@ defmodule LiveBeatsWeb.LiveHelpers do
     """
   end
 
+  attr :flash, :map
+  attr :kiny, :atom
   def flash(%{kind: :error} = assigns) do
     ~H"""
     <%= if live_flash(@flash, @kind) do %>
@@ -140,51 +141,54 @@ defmodule LiveBeatsWeb.LiveHelpers do
     """
   end
 
+  attr :name, :atom, required: true
+  attr :outlined, :boolean, default: false
+  attr :rest, :global, default: %{class: "w-4 h-4 inline-block"}
   def icon(assigns) do
-    assigns =
-      assigns
-      |> assign_new(:outlined, fn -> false end)
-      |> assign_new(:class, fn -> "w-4 h-4 inline-block" end)
-      |> assign_new(:"aria-hidden", fn -> !Map.has_key?(assigns, :"aria-label") end)
+    assigns = assign_new(assigns, :"aria-hidden", fn -> !Map.has_key?(assigns, :"aria-label") end)
 
     ~H"""
     <%= if @outlined do %>
-      <%= apply(Heroicons.Outline, @name, [assigns_to_attributes(assigns, [:outlined, :name])]) %>
+      <%= apply(Heroicons.Outline, @name, [Map.to_list(@rest)]) %>
     <% else %>
-      <%= apply(Heroicons.Solid, @name, [assigns_to_attributes(assigns, [:outlined, :name])]) %>
+      <%= apply(Heroicons.Solid, @name, [Map.to_list(@rest)]) %>
     <% end %>
     """
   end
 
+  attr :navigate, :string
+  attr :patch, :string
+  attr :href, :string, default: nil
+  attr :replace, :string, default: false
+  attr :rest, :global
   def link(%{navigate: _to} = assigns) do
     assigns = assign_new(assigns, :class, fn -> nil end)
 
     ~H"""
-    <a href={@navigate} data-phx-link="redirect" data-phx-link-state="push" class={@class}>
+    <a href={@navigate} data-phx-link="redirect" data-phx-link-state="push" {@rest}>
       <%= render_slot(@inner_block) %>
     </a>
     """
   end
 
-  def link(%{patch: to} = assigns) do
-    opts = assigns |> assigns_to_attributes() |> Keyword.put(:to, to)
-    assigns = assign(assigns, :opts, opts)
-
+  def link(%{patch: _to} = assigns) do
     ~H"""
-    <%= live_patch @opts do %>
+    <a
+      href={@patch}
+      data-phx-link="patch"
+      data-phx-link-state={if @replace, do: "replace", else: "push"}
+      {@rest}
+    >
       <%= render_slot(@inner_block) %>
-    <% end %>
+    </a>
     """
   end
 
   def link(%{} = assigns) do
-    opts = assigns |> assigns_to_attributes() |> Keyword.put(:to, assigns[:href] || "#")
-    assigns = assign(assigns, :opts, opts)
-
     ~H"""
-    <%= Phoenix.HTML.Link.link @opts do %>
+    <a href={@href || "#"} {@rest}>
       <%= render_slot(@inner_block) %>
-    <% end %>
+    </a>
     """
   end
 
@@ -209,13 +213,13 @@ defmodule LiveBeatsWeb.LiveHelpers do
         <:link navigate={Routes.settings_path(LiveBeatsWeb.Endpoint, :edit)}Settings</:link>
       </.dropdown>
   """
+  attr :id, :string, required: true
+  attr :ok, :string, required: true
+  attr :img, :list, default: []
+  attr :title, :list, default: []
+  attr :subtitle, :list, default: []
+  attr :link, :list, default: []
   def dropdown(assigns) do
-    assigns =
-      assigns
-      |> assign_new(:img, fn -> nil end)
-      |> assign_new(:title, fn -> nil end)
-      |> assign_new(:subtitle, fn -> nil end)
-
     ~H"""
     <!-- User account dropdown -->
     <div class="px-3 mt-6 relative inline-block text-left">
@@ -387,20 +391,18 @@ defmodule LiveBeatsWeb.LiveHelpers do
     |> JS.dispatch("click", to: "##{id} [data-modal-return]")
   end
 
+  attr :id, :string, required: true
+  attr :show, :boolean, default: false
+  attr :patch, :string, default: nil
+  attr :navigate, :string, default: nil
+  attr :on_cancel, JS, default: %JS{}
+  attr :on_confirm, JS, default: %JS{}
+  # slots
+  attr :title, :list, default: []
+  attr :confirm, :list, default: []
+  attr :cancel, :list, default: []
+  attr :rest, :global
   def modal(assigns) do
-    assigns =
-      assigns
-      |> assign_new(:show, fn -> false end)
-      |> assign_new(:patch, fn -> nil end)
-      |> assign_new(:navigate, fn -> nil end)
-      |> assign_new(:on_cancel, fn -> %JS{} end)
-      |> assign_new(:on_confirm, fn -> %JS{} end)
-      # slots
-      |> assign_new(:title, fn -> [] end)
-      |> assign_new(:confirm, fn -> [] end)
-      |> assign_new(:cancel, fn -> [] end)
-      |> assign_rest(~w(id show patch navigate on_cancel on_confirm title confirm cancel)a)
-
     ~H"""
     <div
       id={@id}
@@ -481,6 +483,8 @@ defmodule LiveBeatsWeb.LiveHelpers do
     """
   end
 
+  attr :id, :string, required: true
+  attr :content, :string
   def focus_wrap(assigns) do
     ~H"""
     <div id={@id} phx-hook="FocusWrap" data-content={@content}>
@@ -491,12 +495,12 @@ defmodule LiveBeatsWeb.LiveHelpers do
     """
   end
 
+  attr :id, :string, required: true
+  attr :min, :integer, default: 0
+  attr :max, :integer, default: 100
+  attr :value, :integer
   def progress_bar(assigns) do
-    assigns =
-      assigns
-      |> assign_new(:min, fn -> 0 end)
-      |> assign_new(:max, fn -> 100 end)
-      |> assign_new(:value, fn -> assigns[:min] || 0 end)
+    assigns = assign_new(assigns, :value, fn -> assigns[:min] || 0 end)
 
     ~H"""
     <div
@@ -516,9 +520,8 @@ defmodule LiveBeatsWeb.LiveHelpers do
     """
   end
 
+  attr :actions, :list, default: []
   def title_bar(assigns) do
-    assigns = assign_new(assigns, :actions, fn -> [] end)
-
     ~H"""
     <!-- Page title & actions -->
     <div class="border-b border-gray-200 px-4 py-4 sm:flex sm:items-center sm:justify-between sm:px-6 lg:px-8 sm:h-16">
@@ -536,13 +539,14 @@ defmodule LiveBeatsWeb.LiveHelpers do
     """
   end
 
+  attr :patch, :string
+  attr :primary, :boolean, default: false
+  attr :rest, :global
   def button(%{patch: _} = assigns) do
-    assigns = assign_new(assigns, :primary, fn -> false end)
-
     ~H"""
     <%= if @primary do %>
       <%= live_patch [to: @patch, class: "order-0 inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:order-1 sm:ml-3"] ++
-        assigns_to_attributes(assigns, [:primary, :patch]) do %>
+        Map.to_list(@rest) do %>
         <%= render_slot(@inner_block) %>
       <% end %>
     <% else %>
@@ -555,11 +559,6 @@ defmodule LiveBeatsWeb.LiveHelpers do
   end
 
   def button(%{} = assigns) do
-    assigns =
-      assigns
-      |> assign_new(:primary, fn -> false end)
-      |> assign(:rest, assigns_to_attributes(assigns))
-
     ~H"""
     <%= if @primary do %>
       <button
@@ -581,6 +580,10 @@ defmodule LiveBeatsWeb.LiveHelpers do
     """
   end
 
+  attr :row_id, :any, default: false
+  attr :rows, :list, required: true
+  # slots
+  attr :col, :list, required: true
   def table(assigns) do
     assigns =
       assigns
@@ -621,13 +624,16 @@ defmodule LiveBeatsWeb.LiveHelpers do
     """
   end
 
+  attr :id, :any, required: true
+  attr :module, :atom, required: true
+  attr :row_id, :any, default: false
+  attr :rows, :list, required: true
+  attr :owns_profile?, :boolean, default: false
+  attr :active_id, :any, default: nil
+  # slots
+  attr :col, :list
   def live_table(assigns) do
-    assigns =
-      assigns
-      |> assign_new(:row_id, fn -> false end)
-      |> assign_new(:active_id, fn -> nil end)
-      |> assign_new(:owns_profile?, fn -> assigns.owns_profile? end)
-      |> assign(:col, for(col <- assigns.col, col[:if] != false, do: col))
+    assigns = assign(assigns, :col, for(col <- assigns.col, col[:if] != false, do: col))
 
     ~H"""
     <div class="hidden mt-8 sm:block">
@@ -680,9 +686,5 @@ defmodule LiveBeatsWeb.LiveHelpers do
     js
     |> JS.dispatch("js:focus-closest", to: to)
     |> hide(to)
-  end
-
-  defp assign_rest(assigns, exclude) do
-    assign(assigns, :rest, assigns_to_attributes(assigns, exclude))
   end
 end
