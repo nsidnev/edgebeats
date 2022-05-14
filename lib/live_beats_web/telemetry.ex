@@ -1,12 +1,13 @@
 defmodule LiveBeatsWeb.Telemetry do
   use Supervisor
+
   import Telemetry.Metrics
 
   def start_link(arg) do
     Supervisor.start_link(__MODULE__, arg, name: __MODULE__)
   end
 
-  @impl true
+  @impl Supervisor
   def init(_arg) do
     children = [
       # Telemetry poller will execute the given period measurements

@@ -1,11 +1,17 @@
 defmodule LiveBeats.MediaLibraryTest do
   use LiveBeats.DataCase
 
-  alias LiveBeats.MediaLibrary
-  alias LiveBeats.Accounts
+  import LiveBeats.{
+    AccountsFixtures,
+    MediaLibraryFixtures
+  }
+
   alias LiveBeats.MediaLibrary.Song
-  import LiveBeats.AccountsFixtures
-  import LiveBeats.MediaLibraryFixtures
+
+  alias LiveBeats.{
+    Accounts,
+    MediaLibrary
+  }
 
   describe "songs" do
     @invalid_attrs %{
@@ -20,7 +26,7 @@ defmodule LiveBeats.MediaLibraryTest do
     test "list_profile_songs/1 returns all songs for a profile" do
       user = user_fixture()
       profile = MediaLibrary.get_profile!(user)
-      song = song_fixture(%{user_id: user.id})
+      song = song_fixture(%{user: user})
       assert MediaLibrary.list_profile_songs(profile) == [song]
     end
 
@@ -59,14 +65,10 @@ defmodule LiveBeats.MediaLibraryTest do
     test "delete_song/1 deletes the song and decrement the user's songs_count" do
       user = user_fixture()
 
-      user
-      |> Ecto.Changeset.change(songs_count: 10)
-      |> LiveBeats.Repo.update()
-
-      song = song_fixture(%{user_id: user.id})
+      song = song_fixture(%{user: user})
       assert :ok = MediaLibrary.delete_song(song)
-      assert_raise Ecto.NoResultsError, fn -> MediaLibrary.get_song!(song.id) end
-      assert Accounts.get_user(user.id).songs_count == 9
+      assert_raise EdgeDB.Error, fn -> MediaLibrary.get_song!(song.id) end
+      assert Accounts.get_user(user.id).songs_count == 0
     end
 
     test "change_song/1 returns a song changeset" do
@@ -89,18 +91,16 @@ defmodule LiveBeats.MediaLibraryTest do
     } do
       user = user_fixture()
 
-      expired_song_1 =
-        song_fixture(user_id: user.id, title: "song1", inserted_at: four_months_ago)
+      expired_song_1 = song_fixture(user: user, title: "song1", inserted_at: four_months_ago)
 
-      expired_song_2 =
-        song_fixture(user_id: user.id, title: "song2", inserted_at: three_months_ago)
+      expired_song_2 = song_fixture(user: user, title: "song2", inserted_at: three_months_ago)
 
-      active_song = song_fixture(user_id: user.id, title: "song3", inserted_at: one_month_ago)
+      active_song = song_fixture(user: user, title: "song3", inserted_at: one_month_ago)
 
       MediaLibrary.expire_songs_older_than(2, :month)
 
-      assert_raise Ecto.NoResultsError, fn -> MediaLibrary.get_song!(expired_song_1.id) end
-      assert_raise Ecto.NoResultsError, fn -> MediaLibrary.get_song!(expired_song_2.id) end
+      assert_raise EdgeDB.Error, fn -> MediaLibrary.get_song!(expired_song_1.id) end
+      assert_raise EdgeDB.Error, fn -> MediaLibrary.get_song!(expired_song_2.id) end
       assert active_song == MediaLibrary.get_song!(active_song.id)
     end
 
@@ -110,8 +110,7 @@ defmodule LiveBeats.MediaLibraryTest do
       user = user_fixture()
 
       songs_changesets =
-        ["1", "2", "3"]
-        |> Enum.reduce(%{}, fn song_number, acc ->
+        Enum.reduce(["1", "2", "3"], %{}, fn song_number, acc ->
           song_changeset =
             Song.changeset(%Song{}, %{title: "song#{song_number}", artist: "artist_one"})
 
@@ -128,7 +127,7 @@ defmodule LiveBeats.MediaLibraryTest do
       for {song, date} <- Enum.zip(created_songs, creation_dates) do
         song
         |> Ecto.Changeset.change(inserted_at: date)
-        |> LiveBeats.Repo.update()
+        |> LiveBeats.EdgeDB.Ecto.update(&LiveBeats.EdgeDB.Tests.update_song/1)
       end
 
       MediaLibrary.expire_songs_older_than(2, :month)

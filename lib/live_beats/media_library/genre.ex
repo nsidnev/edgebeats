@@ -1,8 +1,12 @@
 defmodule LiveBeats.MediaLibrary.Genre do
   use Ecto.Schema
+  use LiveBeats.EdgeDB.Ecto.Mapper
+
   import Ecto.Changeset
 
-  schema "genres" do
+  @primary_key {:id, :binary_id, autogenerate: false}
+
+  schema "default::Genre" do
     field :title, :string
     field :slug, :string
   end
@@ -16,6 +20,7 @@ defmodule LiveBeats.MediaLibrary.Genre do
   end
 
   defp put_slug(%Ecto.Changeset{valid?: false} = changeset), do: changeset
+
   defp put_slug(%Ecto.Changeset{valid?: true} = changeset) do
     if title = get_change(changeset, :title) do
       put_change(changeset, :slug, Phoenix.Naming.underscore(title))

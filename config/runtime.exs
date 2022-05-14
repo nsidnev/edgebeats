@@ -12,35 +12,15 @@ if System.get_env("PHX_SERVER") && System.get_env("RELEASE_NAME") do
 end
 
 if config_env() == :prod do
-  database_url =
-    System.get_env("DATABASE_URL") ||
-      raise """
-      environment variable DATABASE_URL is missing.
-      For example: ecto://USER:PASS@HOST/DATABASE
-      """
-
-  replica_database_url =
-    System.get_env("REPLICA_DATABASE_URL") || database_url
-
   host = System.get_env("PHX_HOST") || "example.com"
-  ecto_ipv6? = System.get_env("ECTO_IPV6") == "true"
+  ipv6? = System.get_env("IPV6") == "true"
 
   app_name =
     System.get_env("FLY_APP_NAME") ||
       raise "FLY_APP_NAME not available"
 
-  config :live_beats, LiveBeats.Repo,
-    # ssl: true,
-    socket_options: if(ecto_ipv6?, do: [:inet6], else: []),
-    url: database_url,
-    pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10")
-
-  config :live_beats, LiveBeats.ReplicaRepo,
-    # ssl: true,
-    priv: "priv/repo",
-    socket_options: if(ecto_ipv6?, do: [:inet6], else: []),
-    url: replica_database_url,
-    pool_size: String.to_integer(System.get_env("POOL_SIZE") || "10")
+  config :edgedb,
+    tcp: if(ipv6?, do: [:inet6], else: [])
 
   secret_key_base =
     System.get_env("SECRET_KEY_BASE") ||
@@ -68,7 +48,6 @@ if config_env() == :prod do
     server_ip: System.fetch_env!("LIVE_BEATS_SERVER_IP"),
     hostname: "livebeats.local",
     transport_opts: [inet6: true]
-
 
   config :live_beats, :github,
     client_id: System.fetch_env!("LIVE_BEATS_GITHUB_CLIENT_ID"),

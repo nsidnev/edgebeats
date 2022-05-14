@@ -1,0 +1,53 @@
+name: Tests
+
+on:
+  push:
+    branches:
+      - "master"
+
+  pull_request:
+      branches:
+        - "*"
+
+env:
+  MIX_ENV: test
+
+jobs:
+  tests:
+    name: Run tests
+
+    runs-on: ubuntu-20.04
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: 24
+          elixir-version: 1.13
+
+      - uses: edgedb/setup-edgedb@v1
+
+      - name: Set up cache
+        uses: actions/cache@v2
+        id: cache
+        with:
+          path: |
+            deps
+            _build
+          key: tests-${{ runner.os }}-${{ hashFiles('mix.lock') }}
+
+      - name: Install dependencies
+        if: steps.mix-cache.outputs.cache-hit != 'true'
+        run: mix deps.get --only test
+
+      - name: Prepare EdgeDB
+        env:
+          DATABASE: live_beats_test
+        run: |
+          edgedb query "CREATE DATABASE ${DATABASE}"
+          edgedb migrate --database ${DATABASE}
+
+      - name: Run tests
+        run: |
+          mix test

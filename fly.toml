@@ -1,4 +1,4 @@
-app = "livebeats"
+app = "edgedb_livebeats"
 
 kill_signal = "SIGTERM"
 kill_timeout = 5
@@ -8,7 +8,7 @@ processes = []
   release_command = "/app/bin/migrate"
 
 [env]
-  PHX_HOST = "livebeats.fly.dev"
+  PHX_HOST = "elb.fly.dev"
 
 [mounts]
   source="data"

@@ -1,5 +1,7 @@
 defmodule LiveBeats.Accounts.Identity do
   use Ecto.Schema
+  use LiveBeats.EdgeDB.Ecto.Mapper
+
   import Ecto.Changeset
 
   alias LiveBeats.Accounts.{Identity, User}
@@ -8,7 +10,10 @@ defmodule LiveBeats.Accounts.Identity do
   @github "github"
 
   @derive {Inspect, except: [:provider_token, :provider_meta]}
-  schema "identities" do
+
+  @primary_key {:id, :binary_id, autogenerate: false}
+
+  schema "default::Identity" do
     field :provider, :string
     field :provider_token, :string
     field :provider_email, :string
@@ -31,12 +36,19 @@ defmodule LiveBeats.Accounts.Identity do
       "provider_id" => to_string(info["id"]),
       "provider_login" => info["login"],
       "provider_name" => info["name"] || info["login"],
-      "provider_email" => primary_email,
+      "provider_email" => primary_email
     }
 
-    %Identity{provider: @github, provider_meta: %{"user" => info, "emails" => emails}}
-    |> cast(params, [:provider_token, :provider_email, :provider_login, :provider_name, :provider_id])
+    %Identity{}
+    |> cast(params, [
+      :provider_token,
+      :provider_email,
+      :provider_login,
+      :provider_name,
+      :provider_id
+    ])
+    |> put_change(:provider, @github)
+    |> put_change(:provider_meta, %{"user" => info, "emails" => emails})
     |> validate_required([:provider_token, :provider_email, :provider_name, :provider_id])
-    |> validate_length(:provider_meta, max: 10_000)
   end
 end

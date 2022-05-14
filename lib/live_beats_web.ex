@@ -23,6 +23,7 @@ defmodule LiveBeatsWeb do
 
       import Plug.Conn
       import LiveBeatsWeb.Gettext
+
       alias LiveBeatsWeb.Router.Helpers, as: Routes
     end
   end
@@ -51,6 +52,7 @@ defmodule LiveBeatsWeb do
               ],
               unquote(opts)
             )
+
       use Phoenix.LiveView, @opts
 
       unquote(view_helpers())
@@ -78,6 +80,7 @@ defmodule LiveBeatsWeb do
   def channel do
     quote do
       use Phoenix.Channel
+
       import LiveBeatsWeb.Gettext
     end
   end
@@ -96,6 +99,7 @@ defmodule LiveBeatsWeb do
       import LiveBeatsWeb.ErrorHelpers
       import LiveBeatsWeb.LiveHelpers
       import LiveBeatsWeb.Gettext
+
       alias LiveBeatsWeb.Router.Helpers, as: Routes
       alias Phoenix.LiveView.JS
     end

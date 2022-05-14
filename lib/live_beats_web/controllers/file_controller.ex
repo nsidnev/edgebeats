@@ -56,7 +56,7 @@ defmodule LiveBeatsWeb.FileController do
 
   defp stream(conn, req, ref) do
     receive do
-      {:tcp, _, _} = msg ->
+      {:tcp, _socket, _data} = msg ->
         {:ok, req, responses} = Mint.HTTP.stream(req, msg)
 
         new_conn =
@@ -64,7 +64,7 @@ defmodule LiveBeatsWeb.FileController do
             {:data, ^ref, data}, acc -> chunk!(acc, data)
             {:done, ^ref}, acc -> halt(acc)
             {:status, ^ref, 200}, acc -> acc
-            {:headers, ^ref, _}, acc -> acc
+            {:headers, ^ref, _headers}, acc -> acc
           end)
 
         if new_conn.halted do

@@ -4,6 +4,7 @@ defmodule LiveBeatsWeb.ErrorHelpers do
   """
 
   use Phoenix.HTML
+
   import Phoenix.LiveView
   import Phoenix.LiveView.Helpers
 
@@ -24,7 +25,9 @@ defmodule LiveBeatsWeb.ErrorHelpers do
     <%= for error <- @error_values do %>
       <span
         phx-feedback-for={@input_name}
-        class={"invalid-feedback inline-block pl-2 pr-2 text-sm text-white bg-red-600 rounded-md #{@class}"}
+        class={
+          "invalid-feedback inline-block pl-2 pr-2 text-sm text-white bg-red-600 rounded-md #{@class}"
+        }
       >
         <%= translate_error(error) %>
       </span>
@@ -65,8 +68,8 @@ defmodule LiveBeatsWeb.ErrorHelpers do
   end
 
   def translate_changeset_errors(changeset) do
-    changeset.errors
-    |> Enum.map(fn {key, value} -> "#{key} #{translate_error(value)}" end)
-    |> Enum.join("\n")
+    Enum.map_join(changeset.errors, "\n", fn {key, value} ->
+      "#{key} #{translate_error(value)}"
+    end)
   end
 end

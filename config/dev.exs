@@ -12,11 +12,8 @@ config :live_beats, :github,
   client_secret: System.fetch_env!("LIVE_BEATS_GITHUB_CLIENT_SECRET")
 
 # Configure your database
-config :live_beats, LiveBeats.Repo,
-  username: "postgres",
-  password: "postgres",
+config :edgedb,
   database: "live_beats_dev",
-  hostname: "localhost",
   show_sensitive_data_on_connection_error: true,
   pool_size: 10
 

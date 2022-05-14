@@ -1,5 +1,5 @@
 defmodule LiveBeatsWeb.ProfileLiveTest do
-  use LiveBeatsWeb.ConnCase
+  use LiveBeatsWeb.ConnCase, async: false
 
   import Phoenix.LiveViewTest
   import LiveBeats.AccountsFixtures
@@ -59,7 +59,7 @@ defmodule LiveBeatsWeb.ProfileLiveTest do
       song = MediaLibrary.get_first_song(profile)
       assert lv |> element("#delete-modal-#{song.id}-confirm") |> render_click()
 
-      {:ok, refreshed_lv, _} = live(conn, LiveHelpers.profile_path(current_user))
+      {:ok, refreshed_lv, _html} = live(conn, LiveHelpers.profile_path(current_user))
       refute render(refreshed_lv) =~ "silence1s"
     end
 

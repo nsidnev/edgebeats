@@ -38,7 +38,7 @@ defmodule LiveBeatsWeb.Nav do
      |> push_event("pong", %{})}
   end
 
-  defp handle_event(_, _, socket), do: {:cont, socket}
+  defp handle_event(_event_type, _event_data, socket), do: {:cont, socket}
 
   defp rate_limited_ping_broadcast(socket, %Accounts.User{} = user, rtt) when is_integer(rtt) do
     now = System.system_time(:millisecond)

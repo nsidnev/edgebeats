@@ -6,7 +6,7 @@ defmodule LiveBeatsWeb.ProfileLive.UploadFormComponent do
 
   @max_songs 10
 
-  @impl true
+  @impl Phoenix.LiveComponent
   def update(%{action: {:duration, entry_ref, result}}, socket) do
     case result do
       {:ok, %MP3Stat{} = stat} ->
@@ -33,7 +33,7 @@ defmodule LiveBeatsWeb.ProfileLive.UploadFormComponent do
      )}
   end
 
-  @impl true
+  @impl Phoenix.LiveComponent
   def handle_event("validate", %{"_target" => ["mp3"]}, socket) do
     {_done, in_progress} = uploaded_entries(socket, :mp3)
 
@@ -169,7 +169,7 @@ defmodule LiveBeatsWeb.ProfileLive.UploadFormComponent do
     do: ~H|Something went wrong|
 
   defp file_error(%{kind: %Ecto.Changeset{}} = assigns),
-    do: ~H|<%= @label %>: <%=  LiveBeatsWeb.ErrorHelpers.translate_changeset_errors(@kind) %>|
+    do: ~H|<%= @label %>: <%= LiveBeatsWeb.ErrorHelpers.translate_changeset_errors(@kind) %>|
 
   defp file_error(%{kind: {msg, opts}} = assigns) when is_binary(msg) and is_list(opts),
     do: ~H|<%= @label %>: <%= LiveBeatsWeb.ErrorHelpers.translate_error(@kind) %>|
@@ -221,6 +221,6 @@ defmodule LiveBeatsWeb.ProfileLive.UploadFormComponent do
   end
 
   defp put_error(socket, {label, msg}) do
-    update(socket, :error_messages, &Enum.take(&1 ++ [{label, msg}], -10))
+    update(socket, :error_messages, &(Enum.take([{label, msg} | &1], 10) |> Enum.reverse()))
   end
 end

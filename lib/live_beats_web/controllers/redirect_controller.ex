@@ -5,7 +5,7 @@ defmodule LiveBeatsWeb.RedirectController do
 
   plug :fetch_current_user
 
-  def redirect_authenticated(conn, _) do
+  def redirect_authenticated(conn, _params) do
     if conn.assigns.current_user do
       LiveBeatsWeb.UserAuth.redirect_if_user_is_authenticated(conn, [])
     else

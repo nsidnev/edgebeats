@@ -1,22 +1,28 @@
 defmodule LiveBeats.Accounts.User do
   use Ecto.Schema
+  use LiveBeats.EdgeDB.Ecto.Mapper
+
   import Ecto.Changeset
 
-  alias LiveBeats.Accounts.{User, Identity}
+  alias LiveBeats.Accounts.{
+    Identity,
+    User
+  }
 
+  @primary_key {:id, :binary_id, autogenerate: false}
 
-  schema "users" do
+  schema "default::User" do
     field :email, :string
     field :name, :string
     field :username, :string
     field :confirmed_at, :naive_datetime
     field :role, :string, default: "subscriber"
     field :profile_tagline, :string
-    field :active_profile_user_id, :id
     field :avatar_url, :string
     field :external_homepage_url, :string
     field :songs_count, :integer
 
+    has_one :active_profile_user, User
     has_many :identities, Identity
 
     timestamps()
@@ -61,21 +67,16 @@ defmodule LiveBeats.Accounts.User do
     |> validate_username()
   end
 
-
   defp validate_email(changeset) do
     changeset
     |> validate_required([:email])
     |> validate_format(:email, ~r/^[^\s]+@[^\s]+$/, message: "must have the @ sign and no spaces")
     |> validate_length(:email, max: 160)
-    |> unsafe_validate_unique(:email, LiveBeats.Repo)
-    |> unique_constraint(:email)
   end
 
-  defp validate_username(changeset) do
+  def validate_username(changeset) do
     changeset
     |> validate_format(:username, ~r/^[a-zA-Z0-9_-]{2,32}$/)
-    |> unsafe_validate_unique(:username, LiveBeats.Repo)
-    |> unique_constraint(:username)
     |> prepare_changes(fn changeset ->
       case fetch_change(changeset, :profile_tagline) do
         {:ok, _} ->

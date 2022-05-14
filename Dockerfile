@@ -66,7 +66,11 @@ RUN mix release
 
 # start a new build stage so that the final image will only contain
 # the compiled release and other runtime necessities
+FROM edgedb/edgedb-cli:linux-x86_64-latest
 FROM ${RUNNER_IMAGE}
+
+# install edgedb-cli into image
+COPY --from=0 /usr/bin/edgedb /usr/bin/edgedb
 
 RUN apt-get update -y && apt-get install -y libstdc++6 openssl libncurses5 locales \
   && apt-get clean && rm -f /var/lib/apt/lists/*_*
@@ -87,7 +91,7 @@ COPY --from=builder --chown=nobody:root /app/_build/prod/rel/live_beats ./
 USER nobody
 
 # Set the runtime ENV
-ENV ECTO_IPV6="true"
+ENV IPV6="true"
 ENV ERL_AFLAGS="-proto_dist inet6_tcp"
 
 CMD /app/bin/server

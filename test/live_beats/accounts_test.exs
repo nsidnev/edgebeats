@@ -7,9 +7,12 @@ defmodule LiveBeats.AccountsTest do
 
   describe "get_user!/1" do
     test "raises if id is invalid" do
-      assert_raise Ecto.NoResultsError, fn ->
-        Accounts.get_user!(-1)
-      end
+      err =
+        assert_raise EdgeDB.Error, fn ->
+          Accounts.get_user!(UUID.uuid4())
+        end
+
+      assert err.name == "NoDataError"
     end
 
     test "returns the user with the given id" do

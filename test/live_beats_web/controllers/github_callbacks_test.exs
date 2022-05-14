@@ -1,5 +1,5 @@
 defmodule LiveBeatsWeb.GithubCallbackTest do
-  use LiveBeatsWeb.ConnCase, async: true
+  use LiveBeatsWeb.ConnCase, async: false
 
   alias LiveBeats.Accounts
 

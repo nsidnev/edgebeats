@@ -1,1 +1,1 @@
-call "%~dp0\live_beats" eval LiveBeats.Release.migrate
+call "%~dp0\edgedb" migrate

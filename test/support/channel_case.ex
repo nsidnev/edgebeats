@@ -28,9 +28,13 @@ defmodule LiveBeatsWeb.ChannelCase do
     end
   end
 
-  setup tags do
-    pid = Ecto.Adapters.SQL.Sandbox.start_owner!(LiveBeats.Repo, shared: not tags[:async])
-    on_exit(fn -> Ecto.Adapters.SQL.Sandbox.stop_owner(pid) end)
+  setup _tags do
+    EdgeDB.Sandbox.initialize(LiveBeats.EdgeDB)
+
+    on_exit(fn ->
+      EdgeDB.Sandbox.clean(LiveBeats.EdgeDB)
+    end)
+
     :ok
   end
 end

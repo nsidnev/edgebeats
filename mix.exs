@@ -5,8 +5,9 @@ defmodule LiveBeats.MixProject do
     [
       app: :live_beats,
       version: "0.1.0",
-      elixir: "~> 1.12",
+      elixir: "~> 1.13",
       elixirc_paths: elixirc_paths(Mix.env()),
+      elixirc_options: [warning_as_errors: true],
       compilers: [:gettext] ++ Mix.compilers(),
       start_permanent: Mix.env() == :prod,
       aliases: aliases(),
@@ -35,9 +36,11 @@ defmodule LiveBeats.MixProject do
     [
       {:phoenix, github: "phoenixframework/phoenix", override: true},
       {:phoenix_ecto, "~> 4.4"},
-      {:ecto_sql, "~> 3.6"},
       {:ecto_network, "~> 1.3.0"},
+      # need Postgrex.INET for EctoNetwork.INET
       {:postgrex, ">= 0.0.0"},
+      {:edgedb, git: "https://github.com/nsidnev/edgedb-elixir"},
+      {:timex, "~> 3.7"},
       {:phoenix_html, "~> 3.0"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
       {:phoenix_live_view, github: "phoenixframework/phoenix_live_view", override: true},
@@ -54,7 +57,8 @@ defmodule LiveBeats.MixProject do
       {:heroicons, "~> 0.2.2"},
       {:castore, "~> 0.1.13"},
       {:tailwind, "~> 0.1"},
-      {:libcluster, "~> 3.3.1"}
+      {:libcluster, "~> 3.3.1"},
+      {:credo, "~> 1.2", only: [:dev, :test], runtime: false}
     ]
   end
 
@@ -66,10 +70,6 @@ defmodule LiveBeats.MixProject do
   # See the documentation for `Mix` for more info on aliases.
   defp aliases do
     [
-      setup: ["deps.get", "ecto.setup"],
-      "ecto.setup": ["ecto.create", "ecto.migrate", "run priv/repo/seeds.exs"],
-      "ecto.reset": ["ecto.drop", "ecto.setup"],
-      test: ["ecto.create --quiet", "ecto.migrate --quiet", "test"],
       "assets.deploy": [
         "tailwind default --minify",
         "esbuild default --minify",

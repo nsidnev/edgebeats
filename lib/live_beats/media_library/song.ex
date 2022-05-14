@@ -1,11 +1,15 @@
 defmodule LiveBeats.MediaLibrary.Song do
   use Ecto.Schema
+  use LiveBeats.EdgeDB.Ecto.Mapper
+
   import Ecto.Changeset
 
-  alias LiveBeats.MediaLibrary.Song
   alias LiveBeats.Accounts
+  alias LiveBeats.MediaLibrary.Song
 
-  schema "songs" do
+  @primary_key {:id, :binary_id, autogenerate: false}
+
+  schema "default::Song" do
     field :album_artist, :string
     field :artist, :string
     field :played_at, :utc_datetime
@@ -13,7 +17,7 @@ defmodule LiveBeats.MediaLibrary.Song do
     field :date_recorded, :naive_datetime
     field :date_released, :naive_datetime
     field :duration, :integer
-    field :status, Ecto.Enum, values: [stopped: 1, playing: 2, paused: 3]
+    field :status, Ecto.Enum, values: [:stopped, :playing, :paused]
     field :title, :string
     field :attribution, :string
     field :mp3_url, :string
@@ -21,6 +25,7 @@ defmodule LiveBeats.MediaLibrary.Song do
     field :mp3_filename, :string
     field :mp3_filesize, :integer, default: 0
     field :server_ip, EctoNetwork.INET
+
     belongs_to :user, Accounts.User
     belongs_to :genre, LiveBeats.MediaLibrary.Genre
 
@@ -34,12 +39,15 @@ defmodule LiveBeats.MediaLibrary.Song do
   @doc false
   def changeset(song, attrs) do
     song
-    |> cast(attrs, [:album_artist, :artist, :title, :attribution, :date_recorded, :date_released])
+    |> cast(attrs, [
+      :album_artist,
+      :artist,
+      :title,
+      :attribution,
+      :date_recorded,
+      :date_released
+    ])
     |> validate_required([:artist, :title])
-    |> unique_constraint(:title,
-      message: "is a duplicated from another song",
-      name: "songs_user_id_title_artist_index"
-    )
   end
 
   def put_user(%Ecto.Changeset{} = changeset, %Accounts.User{} = user) do

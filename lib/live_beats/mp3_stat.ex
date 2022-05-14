@@ -8,8 +8,6 @@ defmodule LiveBeats.MP3Stat do
   use Bitwise
   alias LiveBeats.MP3Stat
 
-  defstruct duration: 0, size: 0, path: nil, title: nil, artist: nil, tags: nil
-
   @declared_frame_ids ~w(AENC APIC ASPI COMM COMR ENCR EQU2 ETCO GEOB GRID LINK MCDI MLLT OWNE PRIV PCNT POPM POSS RBUF RVA2 RVRB SEEK SIGN SYLT SYTC TALB TBPM TCOM TCON TCOP TDEN TDLY TDOR TDRC TDRL TDTG TENC TEXT TFLT TIPL TIT1 TIT2 TIT3 TKEY TLAN TLEN TMCL TMED TMOO TOAL TOFN TOLY TOPE TOWN TPE1 TPE2 TPE3 TPE4 TPOS TPRO TPUB TRCK TRSN TRSO TSOA TSOP TSOT TSRC TSSE TSST TXXX UFID USER USLT WCOM WCOP WOAF WOAR WOAS WORS WPAY WPUB WXXX)
 
   @v1_l1_bitrates {:invalid, 32, 64, 96, 128, 160, 192, 224, 256, 288, 320, 352, 384, 416, 448,
@@ -23,14 +21,16 @@ defmodule LiveBeats.MP3Stat do
   @v2_l2_l3_bitrates {:invalid, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160,
                       :invalid}
 
+  defstruct duration: 0, size: 0, path: nil, title: nil, artist: nil, tags: nil
+
   def to_mmss(duration) when is_integer(duration) do
     hours = div(duration, 60 * 60)
     minutes = div(duration - hours * 60 * 60, 60)
     seconds = rem(duration - hours * 60 * 60 - minutes * 60, 60)
 
-    [minutes, seconds]
-    |> Enum.map(fn count -> String.pad_leading("#{count}", 2, ["0"]) end)
-    |> Enum.join(":")
+    Enum.map_join([minutes, seconds], ":", fn count ->
+      String.pad_leading("#{count}", 2, ["0"])
+    end)
   end
 
   def parse(path) do
@@ -58,7 +58,7 @@ defmodule LiveBeats.MP3Stat do
         {:error, :bad_file}
     end
   rescue
-    _ -> {:error, :bad_file}
+    _error -> {:error, :bad_file}
   end
 
   defp parse_tag(<<
@@ -95,7 +95,7 @@ defmodule LiveBeats.MP3Stat do
     {%{}, rest}
   end
 
-  defp parse_tag(_), do: {%{}, ""}
+  defp parse_tag(_data), do: {%{}, ""}
 
   defp decode_synchsafe_integer(<<bin>>), do: bin
 
@@ -114,7 +114,7 @@ defmodule LiveBeats.MP3Stat do
          rest::binary
        >>) do
     remaining_ext_header_size = ext_header_size - 6
-    <<_::binary-size(remaining_ext_header_size), rest::binary>> = rest
+    <<_remaining_ext_header::binary-size(remaining_ext_header_size), rest::binary>> = rest
     {rest, ext_header_size}
   end
 
@@ -126,11 +126,11 @@ defmodule LiveBeats.MP3Stat do
        >>) do
     ext_header_size = decode_synchsafe_integer(ext_header_size_synchsafe)
     remaining_ext_header_size = ext_header_size - 6
-    <<_::binary-size(remaining_ext_header_size), rest::binary>> = rest
+    <<_remaining_ext_header::binary-size(remaining_ext_header_size), rest::binary>> = rest
     {rest, ext_header_size}
   end
 
-  defp parse_frames(_, data, tag_length_remaining, frames)
+  defp parse_frames(_version, data, tag_length_remaining, frames)
        when tag_length_remaining <= 0 do
     {Map.new(frames), data}
   end
@@ -184,13 +184,13 @@ defmodule LiveBeats.MP3Stat do
     end
   end
 
-  defp parse_frames(_, data, _, frames) do
+  defp parse_frames(_version, data, _tag_length, frames) do
     {Map.new(frames), data}
   end
 
   defp decode_frame("TXXX", frame_size, <<text_encoding::size(8), rest::binary>>) do
     {description, desc_size, rest} = decode_string(text_encoding, frame_size - 1, rest)
-    {value, _, rest} = decode_string(text_encoding, frame_size - 1 - desc_size, rest)
+    {value, _max_byte_size, rest} = decode_string(text_encoding, frame_size - 1 - desc_size, rest)
     {{"TXXX", {description, value}}, rest}
   end
 
@@ -200,7 +200,7 @@ defmodule LiveBeats.MP3Stat do
          <<text_encoding::size(8), language::binary-size(3), rest::binary>>
        ) do
     {short_desc, desc_size, rest} = decode_string(text_encoding, frame_size - 4, rest)
-    {value, _, rest} = decode_string(text_encoding, frame_size - 4 - desc_size, rest)
+    {value, _max_byte_size, rest} = decode_string(text_encoding, frame_size - 4 - desc_size, rest)
     {{"COMM", {language, short_desc, value}}, rest}
   end
 
@@ -239,7 +239,7 @@ defmodule LiveBeats.MP3Stat do
 
   defp decode_string_sequence(encoding, max_byte_size, data, acc \\ [])
 
-  defp decode_string_sequence(_, max_byte_size, data, acc) when max_byte_size <= 0 do
+  defp decode_string_sequence(_encoding, max_byte_size, data, acc) when max_byte_size <= 0 do
     {Enum.reverse(acc), data}
   end
 
@@ -273,7 +273,7 @@ defmodule LiveBeats.MP3Stat do
       [str, rest] when byte_size(str) + 1 <= max_byte_size ->
         {str, byte_size(str) + 1, rest}
 
-      _ ->
+      _other ->
         {str, rest} = :erlang.split_binary(data, max_byte_size)
         {str, max_byte_size, rest}
     end
@@ -285,7 +285,7 @@ defmodule LiveBeats.MP3Stat do
     {acc |> Enum.reverse() |> :binary.list_to_bin(), rest}
   end
 
-  defp get_double_null_terminated(<<0, 0, rest::binary>>, _, acc) do
+  defp get_double_null_terminated(<<0, 0, rest::binary>>, _max_byte_size, acc) do
     {acc |> Enum.reverse() |> :binary.list_to_bin(), rest}
   end
 
@@ -327,13 +327,13 @@ defmodule LiveBeats.MP3Stat do
       <<_skipped::binary-size(frame_size), rest::binary>> = data
       parse_frame(rest, acc + frame_duration, frame_count + 1, offset + frame_size)
     else
-      _ ->
-        <<_::size(8), rest::binary>> = data
+      _other ->
+        <<_skipped::size(8), rest::binary>> = data
         parse_frame(rest, acc, frame_count, offset + 1)
     end
   end
 
-  defp parse_frame(<<_::size(8), rest::binary>>, acc, frame_count, offset) do
+  defp parse_frame(<<_skipped::size(8), rest::binary>>, acc, frame_count, offset) do
     parse_frame(rest, acc, frame_count, offset + 1)
   end
 

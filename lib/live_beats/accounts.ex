@@ -1,9 +1,10 @@
 defmodule LiveBeats.Accounts do
-  import Ecto.Query
   import Ecto.Changeset
 
-  alias LiveBeats.Repo
-  alias LiveBeats.Accounts.{User, Identity, Events}
+  alias LiveBeats.Accounts.{
+    Events,
+    User
+  }
 
   @pubsub LiveBeats.PubSub
 
@@ -18,16 +19,20 @@ defmodule LiveBeats.Accounts do
   defp topic(user_id), do: "user:#{user_id}"
 
   def list_users(opts) do
-    Repo.replica().all(from u in User, limit: ^Keyword.fetch!(opts, :limit))
+    LiveBeats.EdgeDB.Accounts.list_users(limit: Keyword.fetch!(opts, :limit))
   end
 
   def get_users_map(user_ids) when is_list(user_ids) do
-    Repo.replica().all(from u in User, where: u.id in ^user_ids, select: {u.id, u})
+    LiveBeats.EdgeDB.Accounts.get_users(user_ids: user_ids)
+    |> Enum.into(%{}, fn %User{} = u ->
+      {u.id, u}
+    end)
   end
 
   def lists_users_by_active_profile(id, opts) do
-    Repo.replica().all(
-      from u in User, where: u.active_profile_user_id == ^id, limit: ^Keyword.fetch!(opts, :limit)
+    LiveBeats.EdgeDB.Accounts.list_users_by_active_profile(
+      id: id,
+      limit: Keyword.fetch!(opts, :limit)
     )
   end
 
@@ -39,10 +44,12 @@ defmodule LiveBeats.Accounts do
   Updates a user public's settings and exectes event.
   """
   def update_public_settings(%User{} = user, attrs) do
-    user
-    |> change_settings(attrs)
-    |> Repo.update()
-    |> case do
+    update_result =
+      user
+      |> change_settings(attrs)
+      |> LiveBeats.EdgeDB.Ecto.update(&LiveBeats.EdgeDB.Accounts.update_public_settings/1)
+
+    case update_result do
       {:ok, new_user} ->
         LiveBeats.execute(__MODULE__, %Events.PublicSettingsChanged{user: new_user})
         {:ok, new_user}
@@ -67,7 +74,7 @@ defmodule LiveBeats.Accounts do
 
   """
   def get_user_by_email(email) when is_binary(email) do
-    Repo.get_by(User, email: email)
+    LiveBeats.EdgeDB.Accounts.get_user_by_email(email: email)
   end
 
   @doc """
@@ -84,20 +91,36 @@ defmodule LiveBeats.Accounts do
       ** (Ecto.NoResultsError)
 
   """
-  def get_user!(id), do: Repo.replica().get!(User, id)
+  def get_user!(id) do
+    case get_user(id) do
+      nil ->
+        raise EdgeDB.Error.no_data_error("user #{id} not found")
 
-  def get_user(id), do: Repo.replica().get(User, id)
+      user ->
+        user
+    end
+  end
 
-  def get_user_by!(fields), do: Repo.replica().get_by!(User, fields)
+  def get_user(id) do
+    LiveBeats.EdgeDB.Accounts.get_user_by_id(id: id)
+  end
 
-  def update_active_profile(%User{active_profile_user_id: same_id} = current_user, same_id) do
+  def get_user_by!(fields) do
+    LiveBeats.EdgeDB.Accounts.query_user(query: Enum.into(fields, %{}))
+  end
+
+  def update_active_profile(
+        %User{active_profile_user: %User{id: same_id}} = current_user,
+        same_id
+      ) do
     current_user
   end
 
   def update_active_profile(%User{} = current_user, profile_uid) do
-    {1, _} =
-      Repo.update_all(from(u in User, where: u.id == ^current_user.id),
-        set: [active_profile_user_id: profile_uid]
+    {:ok, _user} =
+      LiveBeats.EdgeDB.Accounts.update_active_profile(
+        id: current_user.id,
+        profile_uid: profile_uid
       )
 
     broadcast!(
@@ -105,7 +128,7 @@ defmodule LiveBeats.Accounts do
       %Events.ActiveProfileChanged{current_user: current_user, new_profile_user_id: profile_uid}
     )
 
-    %User{current_user | active_profile_user_id: profile_uid}
+    %User{current_user | active_profile_user: %User{id: profile_uid}}
   end
 
   ## User registration
@@ -119,20 +142,17 @@ defmodule LiveBeats.Accounts do
     else
       info
       |> User.github_registration_changeset(primary_email, emails, token)
-      |> Repo.insert()
+      |> LiveBeats.EdgeDB.Ecto.insert(&LiveBeats.EdgeDB.Accounts.register_github_user/1,
+        nested: true
+      )
     end
   end
 
   def get_user_by_provider(provider, email) when provider in [:github] do
-    query =
-      from(u in User,
-        join: i in assoc(u, :identities),
-        where:
-          i.provider == ^to_string(provider) and
-            fragment("lower(?)", u.email) == ^String.downcase(email)
-      )
-
-    Repo.one(query)
+    LiveBeats.EdgeDB.Accounts.get_user_by_provider(
+      provider: to_string(provider),
+      email: String.downcase(email)
+    )
   end
 
   def change_settings(%User{} = user, attrs) do
@@ -141,15 +161,17 @@ defmodule LiveBeats.Accounts do
 
   defp update_github_token(%User{} = user, new_token) do
     identity =
-      Repo.one!(from(i in Identity, where: i.user_id == ^user.id and i.provider == "github"))
+      LiveBeats.EdgeDB.Accounts.get_identity_for_user(user_id: user.id, provider: "github")
 
     {:ok, _} =
       identity
       |> change()
       |> put_change(:provider_token, new_token)
-      |> Repo.update()
+      |> LiveBeats.EdgeDB.Ecto.update(&LiveBeats.EdgeDB.Accounts.update_identity_token/1)
 
-    {:ok, Repo.preload(user, :identities, force: true)}
+    identities = LiveBeats.EdgeDB.Accounts.get_user_identities(user_id: user.id)
+
+    {:ok, %User{user | identities: identities}}
   end
 
   defp broadcast!(%User{} = user, msg) do

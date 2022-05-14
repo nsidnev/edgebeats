@@ -7,13 +7,7 @@
 # General application configuration
 import Config
 
-config :live_beats,
-  replica: LiveBeats.ReplicaRepo,
-  ecto_repos: [LiveBeats.Repo]
-
-
-config :live_beats, :files,
-  admin_usernames: []
+config :live_beats, :files, admin_usernames: []
 
 # Configures the endpoint
 config :live_beats, LiveBeatsWeb.Endpoint,
@@ -22,6 +16,10 @@ config :live_beats, LiveBeatsWeb.Endpoint,
   render_errors: [view: LiveBeatsWeb.ErrorView, accepts: ~w(html json), layout: false],
   pubsub_server: LiveBeats.PubSub,
   live_view: [signing_salt: "OHBVr+w4"]
+
+config :live_beats, :songs_cleaner,
+  use: true,
+  interval: {3600 * 6, :second}
 
 # Configures the mailer
 #

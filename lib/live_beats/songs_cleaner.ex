@@ -12,13 +12,13 @@ defmodule LiveBeats.SongsCleaner do
     GenServer.start_link(__MODULE__, opts, name: __MODULE__)
   end
 
-  @impl true
+  @impl GenServer
   def init(opts) do
     {count, interval} = Keyword.fetch!(opts, :interval)
     {:ok, schedule_cleanup(%{count: count, interval: interval}, 0)}
   end
 
-  @impl true
+  @impl GenServer
   def handle_info(:remove_songs, %{count: count, interval: interval} = state) do
     MediaLibrary.expire_songs_older_than(count, interval)
     {:noreply, schedule_cleanup(state)}

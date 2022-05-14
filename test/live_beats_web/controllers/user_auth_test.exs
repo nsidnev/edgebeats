@@ -1,9 +1,10 @@
 defmodule LiveBeatsWeb.UserAuthTest do
-  use LiveBeatsWeb.ConnCase, async: true
+  use LiveBeatsWeb.ConnCase, async: false
+
+  import LiveBeats.AccountsFixtures
 
   alias LiveBeats.Accounts
   alias LiveBeatsWeb.UserAuth
-  import LiveBeats.AccountsFixtures
 
   setup %{conn: conn} do
     conn =

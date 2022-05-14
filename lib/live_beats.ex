@@ -19,6 +19,7 @@ defmodule LiveBeats do
   """
   def config([main_key | rest] = keyspace) when is_list(keyspace) do
     main = Application.fetch_env!(:live_beats, main_key)
+
     Enum.reduce(rest, main, fn next_key, current ->
       case Keyword.fetch(current, next_key) do
         {:ok, val} -> val
@@ -55,7 +56,7 @@ defmodule LiveBeats do
   """
   def attach(target_mod, opts) when is_atom(target_mod) do
     {src_mod, struct_mod} = Keyword.fetch!(opts, :to)
-    _ = struct_mod.__struct__
+    _struct = struct_mod.__struct__
 
     :ok =
       :telemetry.attach(target_mod, [src_mod, struct_mod], &__MODULE__.handle_execute/4, %{
@@ -81,15 +82,13 @@ defmodule LiveBeats do
 
   @doc false
   def handle_execute([src_mod, event_mod], %event_mod{} = event_struct, _meta, %{target: target}) do
-    try do
-      target.handle_execute({src_mod, event_struct})
-    catch
-      kind, err ->
-        Logger.error """
-        executing {#{inspect(src_mod)}, #{inspect(event_mod)}} failed with #{inspect(kind)}
+    target.handle_execute({src_mod, event_struct})
+  catch
+    kind, err ->
+      Logger.error("""
+      executing {#{inspect(src_mod)}, #{inspect(event_mod)}} failed with #{inspect(kind)}
 
-            #{inspect(err)}
-        """
-    end
+          #{inspect(err)}
+      """)
   end
 end
