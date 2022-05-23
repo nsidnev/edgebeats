@@ -1,6 +1,6 @@
 defmodule LiveBeats.Accounts.Identity do
   use Ecto.Schema
-  use LiveBeats.EdgeDB.Ecto.Mapper
+  use EdgeDBEcto.Mapper
 
   import Ecto.Changeset
 

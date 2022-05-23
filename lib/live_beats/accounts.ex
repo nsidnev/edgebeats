@@ -47,7 +47,7 @@ defmodule LiveBeats.Accounts do
     update_result =
       user
       |> change_settings(attrs)
-      |> LiveBeats.EdgeDB.Ecto.update(&LiveBeats.EdgeDB.Accounts.update_public_settings/1)
+      |> EdgeDBEcto.update(&LiveBeats.EdgeDB.Accounts.update_public_settings/1)
 
     case update_result do
       {:ok, new_user} ->
@@ -142,7 +142,7 @@ defmodule LiveBeats.Accounts do
     else
       info
       |> User.github_registration_changeset(primary_email, emails, token)
-      |> LiveBeats.EdgeDB.Ecto.insert(&LiveBeats.EdgeDB.Accounts.register_github_user/1,
+      |> EdgeDBEcto.insert(&LiveBeats.EdgeDB.Accounts.register_github_user/1,
         nested: true
       )
     end
@@ -167,7 +167,7 @@ defmodule LiveBeats.Accounts do
       identity
       |> change()
       |> put_change(:provider_token, new_token)
-      |> LiveBeats.EdgeDB.Ecto.update(&LiveBeats.EdgeDB.Accounts.update_identity_token/1)
+      |> EdgeDBEcto.update(&LiveBeats.EdgeDB.Accounts.update_identity_token/1)
 
     identities = LiveBeats.EdgeDB.Accounts.get_user_identities(user_id: user.id)
 
