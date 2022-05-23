@@ -127,7 +127,7 @@ defmodule LiveBeats.MediaLibraryTest do
       for {song, date} <- Enum.zip(created_songs, creation_dates) do
         song
         |> Ecto.Changeset.change(inserted_at: date)
-        |> LiveBeats.EdgeDB.Ecto.update(&LiveBeats.EdgeDB.Tests.update_song/1)
+        |> EdgeDBEcto.update(&LiveBeats.EdgeDB.Tests.update_song/1)
       end
 
       MediaLibrary.expire_songs_older_than(2, :month)

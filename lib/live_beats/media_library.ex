@@ -89,7 +89,7 @@ defmodule LiveBeats.MediaLibrary do
         end,
         []
       )
-      |> LiveBeats.EdgeDB.Ecto.transaction()
+      |> LiveBeats.EdgeDB.transaction()
 
     elapsed = elapsed_playback(new_song)
 
@@ -119,7 +119,7 @@ defmodule LiveBeats.MediaLibrary do
         end,
         []
       )
-      |> LiveBeats.EdgeDB.Ecto.transaction()
+      |> LiveBeats.EdgeDB.transaction()
 
     broadcast!(song.user.id, %Events.Pause{song: song})
   end
@@ -187,7 +187,7 @@ defmodule LiveBeats.MediaLibrary do
         validate_songs_limit(user.songs_count, new_songs_count)
       end)
 
-    case LiveBeats.EdgeDB.Ecto.transaction(multi) do
+    case LiveBeats.EdgeDB.transaction(multi) do
       {:ok, results} ->
         songs =
           results
@@ -228,7 +228,7 @@ defmodule LiveBeats.MediaLibrary do
   def create_genre(attrs \\ %{}) do
     %Genre{}
     |> Genre.changeset(attrs)
-    |> LiveBeats.EdgeDB.Ecto.insert(&LiveBeats.EdgeDB.MediaLibrary.insert_genre/1)
+    |> EdgeDBEcto.insert(&LiveBeats.EdgeDB.MediaLibrary.insert_genre/1)
   end
 
   def list_genres do
@@ -303,7 +303,7 @@ defmodule LiveBeats.MediaLibrary do
   def update_song(%Song{} = song, attrs) do
     song
     |> Song.changeset(attrs)
-    |> LiveBeats.EdgeDB.Ecto.update(&LiveBeats.EdgeDB.MediaLibrary.update_song/1)
+    |> EdgeDBEcto.update(&LiveBeats.EdgeDB.MediaLibrary.update_song/1)
   end
 
   def delete_song(%Song{} = song) do
@@ -312,7 +312,7 @@ defmodule LiveBeats.MediaLibrary do
     multi_result =
       Ecto.Multi.new()
       |> Ecto.Multi.delete(:delete, song, callback: &LiveBeats.EdgeDB.MediaLibrary.delete_song/2)
-      |> LiveBeats.EdgeDB.Ecto.transaction()
+      |> LiveBeats.EdgeDB.transaction()
 
     case multi_result do
       {:ok, _} -> :ok
@@ -353,7 +353,7 @@ defmodule LiveBeats.MediaLibrary do
           end
         end
       )
-      |> LiveBeats.EdgeDB.Ecto.transaction()
+      |> LiveBeats.EdgeDB.transaction()
 
     case multi_result do
       {:ok, transaction_result} ->

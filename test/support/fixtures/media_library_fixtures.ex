@@ -40,7 +40,7 @@ defmodule LiveBeats.MediaLibraryFixtures do
     {:ok, song} =
       Song
       |> struct!(attrs)
-      |> LiveBeats.EdgeDB.Ecto.insert(callback, keep: [:inserted_at, :updated_at])
+      |> EdgeDBEcto.insert(callback, keep: [:inserted_at, :updated_at])
 
     song
   end

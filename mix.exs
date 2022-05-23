@@ -40,6 +40,7 @@ defmodule LiveBeats.MixProject do
       # need Postgrex.INET for EctoNetwork.INET
       {:postgrex, ">= 0.0.0"},
       {:edgedb, git: "https://github.com/nsidnev/edgedb-elixir"},
+      {:edgedb_ecto, git: "https://github.com/nsidnev/edgedb_ecto"},
       {:timex, "~> 3.7"},
       {:phoenix_html, "~> 3.0"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
