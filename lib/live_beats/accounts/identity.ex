@@ -32,6 +32,8 @@ defmodule LiveBeats.Accounts.Identity do
   """
   def github_registration_changeset(info, primary_email, emails, token) do
     params = %{
+      "provider" => @github,
+      "provider_meta" =>  %{"user" => info, "emails" => emails},
       "provider_token" => token,
       "provider_id" => to_string(info["id"]),
       "provider_login" => info["login"],
@@ -41,14 +43,14 @@ defmodule LiveBeats.Accounts.Identity do
 
     %Identity{}
     |> cast(params, [
+      :provider,
+      :provider_meta,
       :provider_token,
       :provider_email,
       :provider_login,
       :provider_name,
       :provider_id
     ])
-    |> put_change(:provider, @github)
-    |> put_change(:provider_meta, %{"user" => info, "emails" => emails})
     |> validate_required([:provider_token, :provider_email, :provider_name, :provider_id])
   end
 end
