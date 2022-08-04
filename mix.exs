@@ -39,7 +39,7 @@ defmodule LiveBeats.MixProject do
       {:ecto_network, "~> 1.3.0"},
       # need Postgrex.INET for EctoNetwork.INET
       {:postgrex, ">= 0.0.0"},
-      {:edgedb, "~> 0.3.0"},
+      {:edgedb, "~> 0.4.0"},
       {:edgedb_ecto, git: "https://github.com/nsidnev/edgedb_ecto"},
       {:timex, "~> 3.7"},
       {:phoenix_html, "~> 3.0"},
