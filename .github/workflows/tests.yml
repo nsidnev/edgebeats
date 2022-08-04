@@ -23,10 +23,13 @@ jobs:
 
       - uses: erlef/setup-beam@v1
         with:
-          otp-version: 24
-          elixir-version: 1.13
+          otp-version: "24"
+          elixir-version: "1.13"
+          edgedb-version: "2.0"
 
       - uses: edgedb/setup-edgedb@v1
+        with:
+          server-version: ${{ matrix.edgedb-version }}
 
       - name: Set up cache
         uses: actions/cache@v2
