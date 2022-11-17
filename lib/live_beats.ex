@@ -17,13 +17,14 @@ defmodule LiveBeats do
       iex> LiveBeats.config([:files, :uploads_dir])
       iex> LiveBeats.config([:files, :host, :port])
   """
-  def config([main_key | rest] = keyspace) when is_list(keyspace) do
+  def config([main_key | rest] = keyspace, default \\ :__missing__) when is_list(keyspace) do
     main = Application.fetch_env!(:live_beats, main_key)
 
     Enum.reduce(rest, main, fn next_key, current ->
       case Keyword.fetch(current, next_key) do
         {:ok, val} -> val
-        :error -> raise ArgumentError, "no config found under #{inspect(keyspace)}"
+        :error when default == :__missing__ -> raise ArgumentError, "no config found under #{inspect(keyspace)}"
+        :error -> default
       end
     end)
   end

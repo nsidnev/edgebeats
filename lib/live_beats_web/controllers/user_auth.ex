@@ -10,10 +10,10 @@ defmodule LiveBeatsWeb.UserAuth do
   def on_mount(:current_user, _params, session, socket) do
     case session do
       %{"user_id" => user_id} ->
-        {:cont, LiveView.assign_new(socket, :current_user, fn -> Accounts.get_user(user_id) end)}
+        {:cont, Phoenix.Component.assign_new(socket, :current_user, fn -> Accounts.get_user(user_id) end)}
 
       %{} ->
-        {:cont, LiveView.assign(socket, :current_user, nil)}
+        {:cont, Phoenix.Component.assign(socket, :current_user, nil)}
     end
   end
 
@@ -21,7 +21,7 @@ defmodule LiveBeatsWeb.UserAuth do
     case session do
       %{"user_id" => user_id} ->
         new_socket =
-          LiveView.assign_new(socket, :current_user, fn -> Accounts.get_user!(user_id) end)
+          Phoenix.Component.assign_new(socket, :current_user, fn -> Accounts.get_user!(user_id) end)
 
         %Accounts.User{} = new_socket.assigns.current_user
         {:cont, new_socket}
@@ -146,6 +146,6 @@ defmodule LiveBeatsWeb.UserAuth do
   defp maybe_store_return_to(conn), do: conn
 
   def signed_in_path(conn) do
-    LiveBeatsWeb.LiveHelpers.profile_path(conn.assigns.current_user)
+    LiveBeatsWeb.CoreComponents.profile_path(conn.assigns.current_user)
   end
 end

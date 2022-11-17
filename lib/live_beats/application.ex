@@ -21,6 +21,7 @@ defmodule LiveBeats.Application do
         {Phoenix.PubSub, name: LiveBeats.PubSub},
         # start presence
         LiveBeatsWeb.Presence,
+        {Finch, name: LiveBeats.Finch},
         # Start the Endpoint (http/https)
         LiveBeatsWeb.Endpoint,
         spec_if(LiveBeats.config([:songs_cleaner, :use]), songs_cleaner_spec())
