@@ -1,11 +1,11 @@
 defmodule LiveBeatsWeb.UserAuth do
+  use LiveBeatsWeb, :verified_routes
   import Plug.Conn
   import Phoenix.Controller
 
   alias Phoenix.LiveView
 
   alias LiveBeats.Accounts
-  alias LiveBeatsWeb.Router.Helpers, as: Routes
 
   def on_mount(:current_user, _params, session, socket) do
     case session do
@@ -36,7 +36,7 @@ defmodule LiveBeatsWeb.UserAuth do
   defp redirect_require_login(socket) do
     socket
     |> LiveView.put_flash(:error, "Please sign in")
-    |> LiveView.redirect(to: Routes.sign_in_path(socket, :index))
+    |> LiveView.redirect(to: ~p"/signin")
   end
 
   @doc """
@@ -80,7 +80,7 @@ defmodule LiveBeatsWeb.UserAuth do
 
     conn
     |> renew_session()
-    |> redirect(to: Routes.sign_in_path(conn, :index))
+    |> redirect(to: ~p"/signin")
   end
 
   @doc """
@@ -118,7 +118,7 @@ defmodule LiveBeatsWeb.UserAuth do
       conn
       |> put_flash(:error, "You must log in to access this page.")
       |> maybe_store_return_to()
-      |> redirect(to: Routes.sign_in_path(conn, :index))
+      |> redirect(to: ~p"/signin")
       |> halt()
     end
   end
