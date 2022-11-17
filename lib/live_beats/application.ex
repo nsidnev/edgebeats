@@ -58,6 +58,6 @@ defmodule LiveBeats.Application do
 
   defp songs_cleaner_spec do
     # Expire songs every six hours
-    {LiveBeats.SongsCleaner, interval: LiveBeats.config([:songs_cleaner, :interval])}
+    {LiveBeats.SongsCleaner, interval: LiveBeats.config([:songs_cleaner, :interval], {3600 * 6, :second})}
   end
 end

@@ -42,6 +42,12 @@ defmodule LiveBeats.MediaLibraryFixtures do
       |> struct!(attrs)
       |> EdgeDBEcto.insert(callback, keep: [:inserted_at, :updated_at])
 
-    song
+    case attrs do
+      %{user: %User{}} ->
+        song
+
+      _other ->
+        %{song | user: nil}
+    end
   end
 end
