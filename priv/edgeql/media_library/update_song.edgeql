@@ -22,6 +22,7 @@ select song {
   album_artist,
   artist,
   duration,
+  position,
   status,
   mp3_url,
   mp3_filename,

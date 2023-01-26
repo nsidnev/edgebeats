@@ -86,6 +86,10 @@ module default {
       default := 0;
     }
 
+    required property position -> int64 {
+      default := 0;
+    }
+
     required property status -> SongStatus {
       default := SongStatus.Stopped;
     }

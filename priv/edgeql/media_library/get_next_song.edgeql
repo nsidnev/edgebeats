@@ -8,6 +8,7 @@ select Song {
   album_artist,
   artist,
   duration,
+  position,
   status,
   mp3_url,
   mp3_filename,
@@ -29,6 +30,5 @@ filter
     and
   .inserted_at > current_song.inserted_at
 order by
-  .inserted_at asc then
-  .id asc
+  .position asc
 limit 1

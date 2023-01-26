@@ -7,6 +7,7 @@ select Song {
   album_artist,
   artist,
   duration,
+  position,
   status,
   mp3_url,
   mp3_filename,
@@ -25,6 +26,5 @@ select Song {
 }
 filter .user.id = <uuid>$user_id
 order by
-  .inserted_at desc then
-  .id desc
+  .position desc
 limit 1

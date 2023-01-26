@@ -171,18 +171,21 @@ defmodule LiveBeats.MediaLibrary do
     user = Accounts.get_user!(user.id)
 
     multi =
-      Enum.reduce(changesets, Ecto.Multi.new(), fn {ref, chset}, acc ->
+      changesets
+      |> Enum.with_index()
+      |> Enum.reduce(Ecto.Multi.new(), fn {{ref, chset}, idx}, acc ->
         chset =
           chset
           |> Song.put_user(user)
           |> Song.put_mp3_path()
           |> Song.put_server_ip()
+          |> Ecto.Changeset.put_change(:position, idx)
 
         Ecto.Multi.insert(acc, {:song, ref}, chset,
           callback: &LiveBeats.EdgeDB.MediaLibrary.insert_song_for_user/2
         )
       end)
-      |> Ecto.Multi.run(:valid_songs_count, fn _repo, changes ->
+      |> Ecto.Multi.run(:valid_songs_count, fn _conn, changes ->
         new_songs_count = changes |> Enum.filter(&match?({{:song, _ref}, _}, &1)) |> Enum.count()
         validate_songs_limit(user.songs_count, new_songs_count)
       end)
@@ -298,6 +301,76 @@ defmodule LiveBeats.MediaLibrary do
   def get_prev_song(%Song{} = song, %Profile{} = profile) do
     prev = LiveBeats.EdgeDB.MediaLibrary.get_prev_song(id: song.id, user_id: profile.user_id)
     prev || get_last_song(profile)
+  end
+
+  def update_song_position(%Song{} = song, new_index) do
+    old_index = song.position
+
+    multi =
+      Ecto.Multi.new()
+      |> Ecto.Multi.run(:valid_index, fn %{__conn__: conn}, _changes ->
+        case LiveBeats.EdgeDB.MediaLibrary.get_user_songs_count([user_id: song.user_id],
+               edgedb: [conn: conn]
+             ) do
+          count when new_index < count -> {:ok, count}
+          _count -> {:error, :index_out_of_range}
+        end
+      end)
+      |> Ecto.Multi.update_all(
+        :dec_positions,
+        fn %{_conn__: conn} ->
+          fn ->
+            LiveBeats.EdgeDB.MediaLibrary.decrease_songs_position(
+              [
+                id: song.id,
+                user_id: song.user_id,
+                old_position: old_index,
+                new_position: new_index
+              ],
+              edgedb: [conn: conn]
+            )
+          end
+        end,
+        []
+      )
+      |> Ecto.Multi.update_all(
+        :inc_positions,
+        fn %{__conn__: conn} ->
+          fn ->
+            LiveBeats.EdgeDB.MediaLibrary.increase_songs_position(
+              [
+                id: song.id,
+                user_id: song.user_id,
+                old_position: old_index,
+                new_position: new_index
+              ],
+              edgedb: [conn: conn]
+            )
+          end
+        end,
+        []
+      )
+      |> Ecto.Multi.update_all(
+        :position,
+        fn %{__conn__: conn} ->
+          fn ->
+            LiveBeats.EdgeDB.MediaLibrary.set_song_position(
+              [id: song.id, position: new_index],
+              edgedb: [conn: conn]
+            )
+          end
+        end,
+        []
+      )
+
+    case LiveBeats.EdgeDB.transaction(multi) do
+      {:ok, _} ->
+        broadcast!(song.user_id, %Events.NewPosition{song: %Song{song | position: new_index}})
+        :ok
+
+      {:error, failed_op, _failed_val, _changes} ->
+        {:error, failed_op}
+    end
   end
 
   def update_song(%Song{} = song, attrs) do
