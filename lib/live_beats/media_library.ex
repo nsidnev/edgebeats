@@ -170,16 +170,18 @@ defmodule LiveBeats.MediaLibrary do
     # refetch user for fresh song count
     user = Accounts.get_user!(user.id)
 
+    starting_position = LiveBeats.EdgeDB.MediaLibrary.get_user_songs_count(user_id: user.id) - 1
+
     multi =
       changesets
       |> Enum.with_index()
-      |> Enum.reduce(Ecto.Multi.new(), fn {{ref, chset}, idx}, acc ->
+      |> Enum.reduce(Ecto.Multi.new(), fn {{ref, chset}, i}, acc ->
         chset =
           chset
           |> Song.put_user(user)
           |> Song.put_mp3_path()
           |> Song.put_server_ip()
-          |> Ecto.Changeset.put_change(:position, idx)
+          |> Ecto.Changeset.put_change(:position, starting_position + i + 1)
 
         Ecto.Multi.insert(acc, {:song, ref}, chset,
           callback: &LiveBeats.EdgeDB.MediaLibrary.insert_song_for_user/2
@@ -294,12 +296,12 @@ defmodule LiveBeats.MediaLibrary do
   end
 
   def get_next_song(%Song{} = song, %Profile{} = profile) do
-    next = LiveBeats.EdgeDB.MediaLibrary.get_next_song(id: song.id, user_id: profile.user_id)
+    next = LiveBeats.EdgeDB.MediaLibrary.get_next_song(id: song.id, user_id: profile.user_id, position: song.position)
     next || get_first_song(profile)
   end
 
   def get_prev_song(%Song{} = song, %Profile{} = profile) do
-    prev = LiveBeats.EdgeDB.MediaLibrary.get_prev_song(id: song.id, user_id: profile.user_id)
+    prev = LiveBeats.EdgeDB.MediaLibrary.get_prev_song(id: song.id, user_id: profile.user_id, position: song.position)
     prev || get_last_song(profile)
   end
 
@@ -320,7 +322,7 @@ defmodule LiveBeats.MediaLibrary do
         :dec_positions,
         fn %{_conn__: conn} ->
           fn ->
-            LiveBeats.EdgeDB.MediaLibrary.decrease_songs_position(
+            LiveBeats.EdgeDB.MediaLibrary.decrease_songs_position_after_update(
               [
                 id: song.id,
                 user_id: song.user_id,
@@ -337,7 +339,7 @@ defmodule LiveBeats.MediaLibrary do
         :inc_positions,
         fn %{__conn__: conn} ->
           fn ->
-            LiveBeats.EdgeDB.MediaLibrary.increase_songs_position(
+            LiveBeats.EdgeDB.MediaLibrary.increase_songs_position_after_update(
               [
                 id: song.id,
                 user_id: song.user_id,
@@ -381,15 +383,36 @@ defmodule LiveBeats.MediaLibrary do
 
   def delete_song(%Song{} = song) do
     delete_song_file(song)
+    old_index = song.position
 
     multi_result =
       Ecto.Multi.new()
       |> Ecto.Multi.delete(:delete, song, callback: &LiveBeats.EdgeDB.MediaLibrary.delete_song/2)
+      |> Ecto.Multi.update_all(
+        :dec_positions,
+        fn %{__conn__: conn} ->
+          fn ->
+            LiveBeats.EdgeDB.MediaLibrary.decrease_songs_position_after_delete(
+              [
+                id: song.id,
+                user_id: song.user_id,
+                old_position: old_index,
+              ],
+              edgedb: [conn: conn]
+            )
+          end
+        end,
+        []
+      )
       |> LiveBeats.EdgeDB.transaction()
 
     case multi_result do
-      {:ok, _} -> :ok
-      other -> other
+      {:ok, _} ->
+        broadcast!(song.user_id, %Events.SongDeleted{song: song})
+        :ok
+
+      other ->
+        other
     end
   end
 

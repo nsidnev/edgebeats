@@ -28,7 +28,7 @@ select Song {
 filter
   .user.id = <uuid>$user_id
     and
-  .inserted_at > current_song.inserted_at
+  .position > <int64>$position
 order by
   .position asc
 limit 1
