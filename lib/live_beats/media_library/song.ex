@@ -17,7 +17,7 @@ defmodule LiveBeats.MediaLibrary.Song do
     field :date_recorded, :naive_datetime
     field :date_released, :naive_datetime
     field :duration, :integer
-    field :status, Ecto.Enum, values: [:stopped, :playing, :paused]
+    field :status, Ecto.Enum, values: [:stopped, :playing, :paused], default: :stopped
     field :title, :string
     field :attribution, :string
     field :mp3_url, :string
