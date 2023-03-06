@@ -28,6 +28,7 @@ defmodule LiveBeatsWeb.ProfileLive.SongEntryComponent do
           value={@title}
           class="block w-full border-0 p-0 text-gray-900 placeholder-gray-500 focus:ring-0 sm:text-sm"
           {%{autofocus: @index == 0}}
+          required
         />
       </div>
       <div class="border border-gray-300 rounded-md px-3 py-2 mt-2 shadow-sm focus-within:ring-1 focus-within:ring-indigo-600 focus-within:border-indigo-600">
@@ -37,6 +38,7 @@ defmodule LiveBeatsWeb.ProfileLive.SongEntryComponent do
           name={"songs[#{@ref}][artist]"}
           value={@artist}
           class="block w-full border-0 p-0 text-gray-900 placeholder-gray-500 focus:ring-0 sm:text-sm"
+          required
         />
       </div>
       <div class="col-span-full sm:grid sm:grid-cols-2 sm:gap-2 sm:items-start">

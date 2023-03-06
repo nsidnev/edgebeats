@@ -11,6 +11,8 @@ config :live_beats, :github,
   client_id: System.fetch_env!("LIVE_BEATS_GITHUB_CLIENT_ID"),
   client_secret: System.fetch_env!("LIVE_BEATS_GITHUB_CLIENT_SECRET")
 
+config :live_beats, :songs_cleaner, use: false
+
 # Configure your database
 config :edgedb,
   database: "live_beats_dev",
