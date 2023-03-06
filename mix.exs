@@ -43,7 +43,7 @@ defmodule LiveBeats.MixProject do
       {:edgedb, "~> 0.4.0"},
       {:edgedb_ecto, git: "https://github.com/nsidnev/edgedb_ecto"},
       {:timex, "~> 3.7"},
-      {:phoenix_html, "~> 3.0"},
+      {:phoenix_html, "~> 3.3"},
       {:phoenix_live_reload, "~> 1.2", only: :dev},
       {:floki, ">= 0.30.0", only: :test},
       {:esbuild, "~> 0.2", runtime: Mix.env() == :dev},
