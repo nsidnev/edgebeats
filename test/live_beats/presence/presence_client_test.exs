@@ -7,8 +7,8 @@ end
 defmodule Phoenix.Presence.ClientTest do
   use ExUnit.Case
 
-  alias Phoenix.Presence.Client.PresenceMock
   alias Phoenix.Presence.Client
+  alias Phoenix.Presence.Client.PresenceMock
 
   @pubsub LiveBeats.PubSub
   @client Phoenix.Presence.Client.Mock

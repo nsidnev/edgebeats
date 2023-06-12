@@ -33,7 +33,7 @@ defmodule LiveBeats.Accounts.Identity do
   def github_registration_changeset(info, primary_email, emails, token) do
     params = %{
       "provider" => @github,
-      "provider_meta" =>  %{"user" => info, "emails" => emails},
+      "provider_meta" => %{"user" => info, "emails" => emails},
       "provider_token" => token,
       "provider_id" => to_string(info["id"]),
       "provider_login" => info["login"],

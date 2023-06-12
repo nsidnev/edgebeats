@@ -94,6 +94,7 @@ defmodule LiveBeatsWeb.Layouts do
 
   attr :id, :string
   attr :current_user, :any
+
   def sidebar_account_dropdown(assigns) do
     ~H"""
     <.dropdown id={@id}>

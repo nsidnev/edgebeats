@@ -5,7 +5,7 @@ defmodule LiveBeats.MixProject do
     [
       app: :live_beats,
       version: "0.1.0",
-      elixir: "~> 1.13",
+      elixir: "~> 1.14",
       elixirc_paths: elixirc_paths(Mix.env()),
       elixirc_options: [warning_as_errors: true],
       start_permanent: Mix.env() == :prod,
@@ -40,7 +40,7 @@ defmodule LiveBeats.MixProject do
       {:ecto_network, "~> 1.3.0"},
       # need Postgrex.INET for EctoNetwork.INET
       {:postgrex, ">= 0.0.0"},
-      {:edgedb, "~> 0.4.0"},
+      {:edgedb, git: "https://github.com/nsidnev/edgedb-elixir", override: true},
       {:edgedb_ecto, git: "https://github.com/nsidnev/edgedb_ecto"},
       {:timex, "~> 3.7"},
       {:phoenix_html, "~> 3.3"},

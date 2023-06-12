@@ -22,9 +22,14 @@ defmodule LiveBeats do
 
     Enum.reduce(rest, main, fn next_key, current ->
       case Keyword.fetch(current, next_key) do
-        {:ok, val} -> val
-        :error when default == :__missing__ -> raise ArgumentError, "no config found under #{inspect(keyspace)}"
-        :error -> default
+        {:ok, val} ->
+          val
+
+        :error when default == :__missing__ ->
+          raise ArgumentError, "no config found under #{inspect(keyspace)}"
+
+        :error ->
+          default
       end
     end)
   end
@@ -83,15 +88,13 @@ defmodule LiveBeats do
 
   @doc false
   def handle_execute([src_mod, event_mod], %event_mod{} = event_struct, _meta, %{target: target}) do
-    try do
-      target.handle_execute({src_mod, event_struct})
-    catch
-      kind, err ->
-        Logger.error("""
-        executing {#{inspect(src_mod)}, #{inspect(event_mod)}} failed with #{inspect(kind)}
+    target.handle_execute({src_mod, event_struct})
+  catch
+    kind, err ->
+      Logger.error("""
+      executing {#{inspect(src_mod)}, #{inspect(event_mod)}} failed with #{inspect(kind)}
 
-            #{inspect(err)}
-        """)
-    end
+          #{inspect(err)}
+      """)
   end
 end

@@ -11,8 +11,8 @@ defmodule LiveBeatsWeb.SettingsLive do
 
     <div class="max-w-3xl px-4 mx-auto mt-6">
       <.form
-        id="settings-form"
         :let={f}
+        id="settings-form"
         for={@changeset}
         phx-change="validate"
         phx-submit="save"

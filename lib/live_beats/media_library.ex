@@ -188,7 +188,7 @@ defmodule LiveBeats.MediaLibrary do
         )
       end)
       |> Ecto.Multi.run(:valid_songs_count, fn _conn, changes ->
-        new_songs_count = changes |> Enum.filter(&match?({{:song, _ref}, _}, &1)) |> Enum.count()
+        new_songs_count = Enum.count(changes, &match?({{:song, _ref}, _}, &1))
         validate_songs_limit(user.songs_count, new_songs_count)
       end)
 
@@ -296,12 +296,24 @@ defmodule LiveBeats.MediaLibrary do
   end
 
   def get_next_song(%Song{} = song, %Profile{} = profile) do
-    next = LiveBeats.EdgeDB.MediaLibrary.get_next_song(id: song.id, user_id: profile.user_id, position: song.position)
+    next =
+      LiveBeats.EdgeDB.MediaLibrary.get_next_song(
+        id: song.id,
+        user_id: profile.user_id,
+        position: song.position
+      )
+
     next || get_first_song(profile)
   end
 
   def get_prev_song(%Song{} = song, %Profile{} = profile) do
-    prev = LiveBeats.EdgeDB.MediaLibrary.get_prev_song(id: song.id, user_id: profile.user_id, position: song.position)
+    prev =
+      LiveBeats.EdgeDB.MediaLibrary.get_prev_song(
+        id: song.id,
+        user_id: profile.user_id,
+        position: song.position
+      )
+
     prev || get_last_song(profile)
   end
 
@@ -396,7 +408,7 @@ defmodule LiveBeats.MediaLibrary do
               [
                 id: song.id,
                 user_id: song.user_id,
-                old_position: old_index,
+                old_position: old_index
               ],
               edgedb: [conn: conn]
             )

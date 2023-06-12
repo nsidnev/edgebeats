@@ -740,8 +740,8 @@ defmodule LiveBeatsWeb.CoreComponents do
   end
 
   def translate_changeset_errors(changeset) do
-    changeset.errors
-    |> Enum.map(fn {key, value} -> "#{key} #{translate_error(value)}" end)
-    |> Enum.join("\n")
+    Enum.map_join(changeset.errors, "\n", fn {key, value} ->
+      "#{key} #{translate_error(value)}"
+    end)
   end
 end

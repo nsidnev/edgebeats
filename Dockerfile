@@ -12,7 +12,7 @@
 #   - https://pkgs.org/ - resource for finding needed packages
 #   - Ex: hexpm/elixir:1.12.0-erlang-24.0.1-debian-bullseye-20210902-slim
 #
-ARG BUILDER_IMAGE="hexpm/elixir:1.12.0-erlang-24.0.1-debian-bullseye-20210902-slim"
+ARG BUILDER_IMAGE="hexpm/elixir:1.14.5-erlang-25.3.2.2-debian-buster-20230522-slim"
 ARG RUNNER_IMAGE="debian:bullseye-20210902-slim"
 
 FROM ${BUILDER_IMAGE} as builder
@@ -66,11 +66,7 @@ RUN mix release
 
 # start a new build stage so that the final image will only contain
 # the compiled release and other runtime necessities
-FROM edgedb/edgedb-cli:linux-x86_64-latest
 FROM ${RUNNER_IMAGE}
-
-# install edgedb-cli into image
-COPY --from=0 /usr/bin/edgedb /usr/bin/edgedb
 
 RUN apt-get update -y && apt-get install -y libstdc++6 openssl libncurses5 locales \
   && apt-get clean && rm -f /var/lib/apt/lists/*_*
@@ -90,8 +86,10 @@ COPY --from=builder --chown=nobody:root /app/_build/prod/rel/live_beats ./
 
 USER nobody
 
+# Appended by flyctl
 # Set the runtime ENV
 ENV IPV6="true"
+ENV ECTO_IPV6 true
 ENV ERL_AFLAGS="-proto_dist inet6_tcp"
 
 CMD /app/bin/server

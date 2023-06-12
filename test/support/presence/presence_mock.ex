@@ -6,7 +6,7 @@ defmodule Phoenix.Presence.Client.PresenceMock do
     GenServer.start_link(__MODULE__, opts[:id], opts)
   end
 
-  @impl true
+  @impl GenServer
   def init(id) do
     {:ok, %{id: id}}
   end
@@ -15,12 +15,12 @@ defmodule Phoenix.Presence.Client.PresenceMock do
     GenServer.cast(pid, {:track, client_pid, topic, key, meta})
   end
 
-  @impl true
+  @impl GenServer
   def handle_info(:quit, state) do
     {:stop, :normal, state}
   end
 
-  @impl true
+  @impl GenServer
   def handle_cast({:track, client_pid, topic, key, meta}, state) do
     Client.track(client_pid, topic, key, meta)
     {:noreply, state}

@@ -69,7 +69,9 @@ defmodule LiveBeatsWeb.GithubCallbackTest do
 
     conn = get(conn, ~p"/oauth/callbacks/github?#{params}")
 
-    assert Phoenix.Flash.get(conn.assigns.flash, :error) == "We were unable to contact GitHub. Please try again later"
+    assert Phoenix.Flash.get(conn.assigns.flash, :error) ==
+             "We were unable to contact GitHub. Please try again later"
+
     assert redirected_to(conn, 302) == "/"
     assert Accounts.list_users(limit: 100) == []
   end

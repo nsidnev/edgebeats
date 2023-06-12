@@ -1,45 +1,43 @@
-app = "edgedb_livebeats"
+# fly.toml app configuration file generated for edgebeats on 2023-06-12T11:43:39-04:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
 
+app = "edgebeats"
+primary_region = "yyz"
 kill_signal = "SIGTERM"
-kill_timeout = 5
-processes = []
-
-[deploy]
-  release_command = "/app/bin/migrate"
-
-[env]
-  PHX_HOST = "elb.fly.dev"
-
-[mounts]
-  source="data"
-  destination="/app/uploads"
+kill_timeout = "5s"
 
 [experimental]
-  allowed_public_ports = []
   auto_rollback = true
 
+[env]
+  PHX_HOST = "edgebeats.fly.dev"
+  PORT = "8080"
+
+[[mounts]]
+  source = "data"
+  destination = "/app/uploads"
+
 [[services]]
-  http_checks = []
-  internal_port = 4000
-  processes = ["app"]
   protocol = "tcp"
-  script_checks = []
-
-  [services.concurrency]
-    hard_limit = 2500
-    soft_limit = 2000
-    type = "connections"
+  internal_port = 8080
+  processes = ["app"]
 
   [[services.ports]]
-    handlers = ["http"]
     port = 80
+    handlers = ["http"]
 
   [[services.ports]]
-    handlers = ["tls", "http"]
     port = 443
+    handlers = ["tls", "http"]
+  [services.concurrency]
+    type = "connections"
+    hard_limit = 1000
+    soft_limit = 1000
 
   [[services.tcp_checks]]
-    grace_period = "20s"  # allow some time for startup
     interval = "15s"
-    restart_limit = 0
     timeout = "2s"
+    grace_period = "20s"
+    restart_limit = 0

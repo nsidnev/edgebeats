@@ -13,14 +13,10 @@ end
 
 if config_env() == :prod do
   host = System.get_env("PHX_HOST") || "example.com"
-  ipv6? = System.get_env("IPV6") == "true"
 
   app_name =
     System.get_env("FLY_APP_NAME") ||
       raise "FLY_APP_NAME not available"
-
-  config :edgedb,
-    tcp: if(ipv6?, do: [:inet6], else: [])
 
   secret_key_base =
     System.get_env("SECRET_KEY_BASE") ||
@@ -46,8 +42,10 @@ if config_env() == :prod do
     uploads_dir: "/app/uploads",
     host: [scheme: "https", host: host, port: 443],
     server_ip: System.fetch_env!("LIVE_BEATS_SERVER_IP"),
-    hostname: "livebeats.local",
+    hostname: "edgebeats.local",
     transport_opts: [inet6: true]
+
+  config :live_beats, :songs_cleaner, use: true
 
   config :live_beats, :github,
     client_id: System.fetch_env!("LIVE_BEATS_GITHUB_CLIENT_ID"),

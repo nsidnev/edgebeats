@@ -10,8 +10,6 @@ defmodule LiveBeatsWeb.Presence do
     pubsub_server: LiveBeats.PubSub,
     presence: __MODULE__
 
-  @pubsub LiveBeats.PubSub
-
   use LiveBeatsWeb, :html
 
   alias LiveBeats.{Accounts, MediaLibrary}

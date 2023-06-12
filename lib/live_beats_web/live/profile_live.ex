@@ -3,7 +3,7 @@ defmodule LiveBeatsWeb.ProfileLive do
 
   alias LiveBeats.{Accounts, MediaLibrary, MP3Stat}
   alias LiveBeatsWeb.{LayoutComponent, Presence}
-  alias LiveBeatsWeb.ProfileLive.{UploadFormComponent}
+  alias LiveBeatsWeb.ProfileLive.UploadFormComponent
 
   @max_presences 20
 

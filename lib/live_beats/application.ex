@@ -24,7 +24,7 @@ defmodule LiveBeats.Application do
         {Finch, name: LiveBeats.Finch},
         # Start the Endpoint (http/https)
         LiveBeatsWeb.Endpoint,
-        spec_if(LiveBeats.config([:songs_cleaner, :use]), songs_cleaner_spec())
+        spec_if(LiveBeats.config([:songs_cleaner, :use], true), songs_cleaner_spec())
 
         # Start a worker by calling: LiveBeats.Worker.start_link(arg)
         # {LiveBeats.Worker, arg}
@@ -58,6 +58,7 @@ defmodule LiveBeats.Application do
 
   defp songs_cleaner_spec do
     # Expire songs every six hours
-    {LiveBeats.SongsCleaner, interval: LiveBeats.config([:songs_cleaner, :interval], {3600 * 6, :second})}
+    {LiveBeats.SongsCleaner,
+     interval: LiveBeats.config([:songs_cleaner, :interval], {3600 * 6, :second})}
   end
 end

@@ -1,6 +1,7 @@
 defmodule LiveBeatsWeb.Nav do
-  import Phoenix.LiveView
   use Phoenix.Component
+
+  import Phoenix.LiveView
 
   alias LiveBeats.{Accounts, MediaLibrary}
   alias LiveBeatsWeb.{ProfileLive, SettingsLive}
