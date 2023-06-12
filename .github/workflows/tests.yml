@@ -23,8 +23,8 @@ jobs:
 
       - uses: erlef/setup-beam@v1
         with:
-          otp-version: "24"
-          elixir-version: "1.13"
+          otp-version: "25"
+          elixir-version: "1.14"
 
       - uses: edgedb/setup-edgedb@v1
         with:
