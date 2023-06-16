@@ -322,7 +322,7 @@ defmodule LiveBeats.MediaLibrary do
 
     multi =
       Ecto.Multi.new()
-      |> Ecto.Multi.run(:index, fn %{__conn__: conn}, _changes ->
+      |> Ecto.Multi.run(:index, fn _repo, %{__conn__: conn} ->
         case LiveBeats.EdgeDB.MediaLibrary.get_user_songs_count([user_id: song.user_id],
                edgedb: [conn: conn]
              ) do
@@ -332,7 +332,7 @@ defmodule LiveBeats.MediaLibrary do
       end)
       |> Ecto.Multi.update_all(
         :dec_positions,
-        fn %{_conn__: conn, index: new_index} ->
+        fn %{__conn__: conn, index: new_index} ->
           fn ->
             LiveBeats.EdgeDB.MediaLibrary.decrease_songs_position_after_update(
               [

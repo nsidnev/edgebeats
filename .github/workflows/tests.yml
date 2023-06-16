@@ -28,7 +28,7 @@ jobs:
 
       - uses: edgedb/setup-edgedb@v1
         with:
-          server-version: "2.0"
+          server-version: "3.0-rc.4"
 
       - name: Set up cache
         uses: actions/cache@v2

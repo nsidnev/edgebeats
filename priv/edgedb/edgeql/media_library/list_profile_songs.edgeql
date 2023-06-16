@@ -26,6 +26,5 @@ select Song {
 }
 filter .user.id = <uuid>$user_id
 order by
-  .inserted_at asc then
-  .id asc
+  .position asc
 limit <int64>$limit
