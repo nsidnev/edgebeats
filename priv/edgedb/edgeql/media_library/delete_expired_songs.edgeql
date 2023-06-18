@@ -1,7 +1,4 @@
-# edgedb = :query!
-# mapper = LiveBeats.MediaLibrary.Song
-
-with song := (
+with songs := (
   delete Song
   filter
     .inserted_at < cal::to_local_datetime(datetime_current() - <duration>$interval, 'UTC')
@@ -10,14 +7,8 @@ with song := (
       and
     .user.username not in array_unpack(<array<str>>$admin_usernames)
 )
-select song {
-  current := datetime_current(),
-  interval := <duration>$interval,
-  compare_time := cal::to_local_datetime(datetime_current() - <duration>$interval, 'UTC'),
-  inserted_at,
-  title,
-  mp3_filepath,
-  user: {
-    id
-  },
+select songs {
+  mp3: {
+    *
+  }
 }

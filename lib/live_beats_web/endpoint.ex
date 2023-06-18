@@ -28,7 +28,6 @@ defmodule LiveBeatsWeb.Endpoint do
     socket "/phoenix/live_reload/socket", Phoenix.LiveReloader.Socket
     plug Phoenix.LiveReloader
     plug Phoenix.CodeReloader
-    plug Phoenix.Ecto.CheckRepoStatus, otp_app: :live_beats
   end
 
   plug Phoenix.LiveDashboard.RequestLogger,

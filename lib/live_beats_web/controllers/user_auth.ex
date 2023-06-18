@@ -10,30 +10,54 @@ defmodule LiveBeatsWeb.UserAuth do
   def on_mount(:current_user, _params, session, socket) do
     case session do
       %{"user_id" => user_id} ->
-        {:cont,
-         Phoenix.Component.assign_new(socket, :current_user, fn -> Accounts.get_user(user_id) end)}
+        client = EdgeDB.with_globals(LiveBeats.EdgeDB, %{"current_user_id" => user_id})
+
+        socket =
+          socket
+          |> Phoenix.Component.assign(:edgedb, client)
+          |> Phoenix.Component.assign_new(:current_user, fn ->
+            Accounts.get_user(client, user_id)
+          end)
+
+        {:cont, socket}
 
       %{} ->
-        {:cont, Phoenix.Component.assign(socket, :current_user, nil)}
+        socket =
+          socket
+          |> Phoenix.Component.assign_new(:edgedb, fn -> LiveBeats.EdgeDB end)
+          |> Phoenix.Component.assign(:current_user, nil)
+
+        {:cont, socket}
     end
   end
 
   def on_mount(:ensure_authenticated, _params, session, socket) do
     case session do
       %{"user_id" => user_id} ->
-        new_socket =
-          Phoenix.Component.assign_new(socket, :current_user, fn ->
-            Accounts.get_user!(user_id)
+        client = EdgeDB.with_globals(LiveBeats.EdgeDB, %{"current_user_id" => user_id})
+
+        socket =
+          socket
+          |> Phoenix.Component.assign(:edgedb, client)
+          |> Phoenix.Component.assign_new(:current_user, fn ->
+            Accounts.get_user!(client, user_id)
           end)
 
-        %Accounts.User{} = new_socket.assigns.current_user
-        {:cont, new_socket}
+        %Accounts.User{} = socket.assigns.current_user
+        {:cont, socket}
 
       %{} ->
         {:halt, redirect_require_login(socket)}
     end
   rescue
-    Ecto.NoResultsError -> {:halt, redirect_require_login(socket)}
+    e in EdgeDB.Error ->
+      case e do
+        %EdgeDB.Error{type: EdgeDB.NoDataError} ->
+          {:halt, redirect_require_login(socket)}
+
+        _other ->
+          {:halt, :error}
+      end
   end
 
   defp redirect_require_login(socket) do
@@ -56,7 +80,13 @@ defmodule LiveBeatsWeb.UserAuth do
   """
   def log_in_user(conn, user) do
     user_return_to = get_session(conn, :user_return_to)
-    conn = assign(conn, :current_user, user)
+
+    edgedb_client = conn.assigns[:edgedb] || LiveBeats.EdgeDB
+
+    conn =
+      conn
+      |> assign(:current_user, user)
+      |> assign(:edgedb, EdgeDB.with_globals(edgedb_client, %{"current_user_id" => user.id}))
 
     conn
     |> renew_session()
@@ -82,6 +112,7 @@ defmodule LiveBeatsWeb.UserAuth do
     end
 
     conn
+    |> assign(:edgedb, LiveBeats.EdgeDB)
     |> renew_session()
     |> redirect(to: ~p"/signin")
   end
@@ -91,7 +122,24 @@ defmodule LiveBeatsWeb.UserAuth do
   """
   def fetch_current_user(conn, _opts) do
     user_id = get_session(conn, :user_id)
-    user = user_id && Accounts.get_user(user_id)
+    edgedb_client = conn.assigns[:edgedb] || LiveBeats.EdgeDB
+
+    edgedb_client =
+      if user_id do
+        EdgeDB.with_globals(edgedb_client, %{"current_user_id" => user_id})
+      else
+        edgedb_client
+      end
+
+    user = user_id && Accounts.get_user(edgedb_client, user_id)
+
+    conn =
+      if user do
+        assign(conn, :edgedb, edgedb_client)
+      else
+        conn
+      end
+
     assign(conn, :current_user, user)
   end
 

@@ -36,15 +36,10 @@ defmodule LiveBeatsWeb.SettingsLive do
                     <%= URI.parse(LiveBeatsWeb.Endpoint.url()).host %>/
                   </span>
                   <%= text_input(f, :username,
+                    disabled: true,
                     class:
-                      "flex-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full min-w-0 rounded-none rounded-r-md sm:text-sm border-gray-300"
+                      "flex-1 focus:ring-indigo-500 focus:border-indigo-500 block w-full min-w-0 rounded-none rounded-r-md sm:text-sm border-gray-300 bg-gray-50"
                   ) %>
-                  <.error
-                    field={:username}
-                    input_name="user[username]"
-                    errors={f.errors}
-                    class="pt-2 pl-4 pr-4 ml-2 text-center"
-                  />
                 </div>
               </div>
 
@@ -99,17 +94,20 @@ defmodule LiveBeatsWeb.SettingsLive do
   end
 
   def mount(_params, _session, socket) do
-    changeset = Accounts.change_settings(socket.assigns.current_user, %{})
+    changeset = Accounts.settings_changeset(socket.assigns.current_user, %{})
     {:ok, assign(socket, changeset: changeset)}
   end
 
   def handle_event("validate", %{"user" => params}, socket) do
-    changeset = Accounts.change_settings(socket.assigns.current_user, params)
+    changeset = Accounts.settings_changeset(socket.assigns.current_user, params)
     {:noreply, assign(socket, changeset: Map.put(changeset, :action, :validate))}
   end
 
   def handle_event("save", %{"user" => params}, socket) do
-    case Accounts.update_public_settings(socket.assigns.current_user, params) do
+    result =
+      Accounts.update_public_settings(socket.assigns.edgedb, socket.assigns.current_user, params)
+
+    case result do
       {:ok, user} ->
         {:noreply,
          socket

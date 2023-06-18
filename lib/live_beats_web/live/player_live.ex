@@ -5,7 +5,7 @@ defmodule LiveBeatsWeb.PlayerLive do
   alias LiveBeats.MediaLibrary.Song
   alias LiveBeatsWeb.Presence
 
-  on_mount {LiveBeatsWeb.UserAuth, :current_user}
+  on_mount({LiveBeatsWeb.UserAuth, :current_user})
 
   def render(assigns) do
     ~H"""
@@ -207,7 +207,8 @@ defmodule LiveBeatsWeb.PlayerLive do
   end
 
   defp switch_profile(socket, nil) do
-    current_user = Accounts.update_active_profile(socket.assigns.current_user, nil)
+    current_user =
+      Accounts.update_active_profile(socket.assigns.edgedb, socket.assigns.current_user, nil)
 
     if profile = connected?(socket) and socket.assigns.profile do
       Presence.untrack_profile_user(profile, current_user.id)
@@ -220,10 +221,12 @@ defmodule LiveBeatsWeb.PlayerLive do
 
   defp switch_profile(socket, profile_user_id) do
     %{current_user: current_user} = socket.assigns
-    profile = get_profile(profile_user_id)
+    profile = get_profile(socket, profile_user_id)
 
     if profile && connected?(socket) do
-      current_user = Accounts.update_active_profile(current_user, profile.user_id)
+      current_user =
+        Accounts.update_active_profile(socket.assigns.edgedb, current_user, profile.user_id)
+
       # untrack last profile the user was listening
       if socket.assigns.profile do
         Presence.untrack_profile_user(socket.assigns.profile, current_user.id)
@@ -259,15 +262,15 @@ defmodule LiveBeatsWeb.PlayerLive do
 
   def handle_event("play_pause", _event_data, socket) do
     %{song: song, playing: playing, current_user: current_user} = socket.assigns
-    song = MediaLibrary.get_song!(song.id)
+    song = MediaLibrary.get_song!(socket.assigns.edgedb, song.id)
 
     cond do
       song && playing and MediaLibrary.can_control_playback?(current_user, song) ->
-        MediaLibrary.pause_song(song)
+        MediaLibrary.pause_song(socket.assigns.edgedb, song)
         {:noreply, assign(socket, playing: false)}
 
       song && MediaLibrary.can_control_playback?(current_user, song) ->
-        MediaLibrary.play_song(song)
+        MediaLibrary.play_song(socket.assigns.edgedb, song)
         {:noreply, assign(socket, playing: true)}
 
       true ->
@@ -283,7 +286,7 @@ defmodule LiveBeatsWeb.PlayerLive do
     %{song: song, current_user: current_user} = socket.assigns
 
     if song && MediaLibrary.can_control_playback?(current_user, song) do
-      MediaLibrary.play_next_song(socket.assigns.profile)
+      MediaLibrary.play_next_song(socket.assigns.edgedb, socket.assigns.profile)
     end
 
     {:noreply, socket}
@@ -293,7 +296,7 @@ defmodule LiveBeatsWeb.PlayerLive do
     %{song: song, current_user: current_user} = socket.assigns
 
     if song && MediaLibrary.can_control_playback?(current_user, song) do
-      MediaLibrary.play_prev_song(socket.assigns.profile)
+      MediaLibrary.play_prev_song(socket.assigns.edgedb, socket.assigns.profile)
     end
 
     {:noreply, socket}
@@ -301,7 +304,7 @@ defmodule LiveBeatsWeb.PlayerLive do
 
   def handle_event("next_song_auto", _event_data, socket) do
     if socket.assigns.song do
-      MediaLibrary.play_next_song_auto(socket.assigns.profile)
+      MediaLibrary.play_next_song_auto(socket.assigns.edgedb, socket.assigns.profile)
     end
 
     {:noreply, socket}
@@ -316,7 +319,7 @@ defmodule LiveBeatsWeb.PlayerLive do
         socket
       ) do
     if user_id do
-      {:noreply, assign(socket, profile: get_profile(user_id))}
+      {:noreply, assign(socket, profile: get_profile(socket, user_id))}
     else
       {:noreply, socket |> assign_profile(nil) |> stop_song()}
     end
@@ -360,7 +363,7 @@ defmodule LiveBeatsWeb.PlayerLive do
   end
 
   defp play_current_song(socket) do
-    song = MediaLibrary.get_current_active_song(socket.assigns.profile)
+    song = MediaLibrary.get_current_active_song(socket.assigns.edgedb, socket.assigns.profile)
 
     cond do
       song && MediaLibrary.playing?(song) ->
@@ -379,8 +382,8 @@ defmodule LiveBeatsWeb.PlayerLive do
       Phoenix.Token.encrypt(socket.endpoint, "file", %{
         vsn: 1,
         ip: to_string(song.server_ip),
-        size: song.mp3_filesize,
-        uuid: song.mp3_filename
+        size: song.mp3.filesize.bytes,
+        uuid: song.mp3.filename
       })
 
     push_event(socket, "play", %{
@@ -390,7 +393,7 @@ defmodule LiveBeatsWeb.PlayerLive do
       elapsed: elapsed,
       duration: song.duration,
       token: token,
-      url: song.mp3_url
+      url: song.mp3.url
     })
   end
 
@@ -429,8 +432,8 @@ defmodule LiveBeatsWeb.PlayerLive do
     JS.dispatch(js, "js:listen_now", to: "#audio-player")
   end
 
-  defp get_profile(user_id) do
-    user_id && Accounts.get_user!(user_id) |> MediaLibrary.get_profile!()
+  defp get_profile(socket, user_id) do
+    user_id && Accounts.get_user!(socket.assigns.edgedb, user_id) |> MediaLibrary.get_profile!()
   end
 
   defp profile_changed?(nil = _prev_profile, nil = _new_profile), do: false

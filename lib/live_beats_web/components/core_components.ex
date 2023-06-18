@@ -739,9 +739,17 @@ defmodule LiveBeatsWeb.CoreComponents do
     end
   end
 
+  def translate_error(msg) when is_binary(msg) do
+    translate_error({msg, []})
+  end
+
   def translate_changeset_errors(changeset) do
     Enum.map_join(changeset.errors, "\n", fn {key, value} ->
       "#{key} #{translate_error(value)}"
     end)
+  end
+
+  def translate_edgedb_error(%EdgeDB.Error{} = error) do
+    translate_error({error.message, []})
   end
 end

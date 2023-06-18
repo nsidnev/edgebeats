@@ -20,7 +20,10 @@ defmodule LiveBeats.SongsCleaner do
 
   @impl GenServer
   def handle_info(:remove_songs, %{count: count, interval: interval} = state) do
-    MediaLibrary.expire_songs_older_than(count, interval)
+    LiveBeats.EdgeDB
+    |> EdgeDB.with_globals(%{"is_admin" => true})
+    |> MediaLibrary.expire_songs_older_than(count, interval)
+
     {:noreply, schedule_cleanup(state)}
   end
 

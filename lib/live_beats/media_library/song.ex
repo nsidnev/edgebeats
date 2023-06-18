@@ -1,34 +1,34 @@
 defmodule LiveBeats.MediaLibrary.Song do
   use Ecto.Schema
-  use EdgeDBEcto.Mapper
+  use LiveBeats.EdgeDB.Ecto.Schema
 
   import Ecto.Changeset
 
   alias LiveBeats.Accounts
-  alias LiveBeats.MediaLibrary.Song
+  alias LiveBeats.MP3Stat
+
+  alias LiveBeats.MediaLibrary.{
+    MP3,
+    Song
+  }
 
   @primary_key {:id, :binary_id, autogenerate: false}
 
-  schema "default::Song" do
-    field :album_artist, :string
+  embedded_schema do
     field :artist, :string
     field :played_at, :utc_datetime
     field :paused_at, :utc_datetime
     field :date_recorded, :naive_datetime
     field :date_released, :naive_datetime
-    field :duration, :integer
     field :status, Ecto.Enum, values: [:stopped, :playing, :paused], default: :stopped
     field :title, :string
     field :attribution, :string
-    field :mp3_url, :string
-    field :mp3_filepath, :string
-    field :mp3_filename, :string
-    field :mp3_filesize, :integer, default: 0
     field :server_ip, EctoNetwork.INET
+    field :duration, LiveBeats.EdgeDB.Ecto.Duration
     field :position, :integer, default: 0
 
-    belongs_to :user, Accounts.User
-    belongs_to :genre, LiveBeats.MediaLibrary.Genre
+    embeds_one :user, Accounts.User
+    embeds_one :mp3, MP3
 
     timestamps()
   end
@@ -41,7 +41,6 @@ defmodule LiveBeats.MediaLibrary.Song do
   def changeset(song, attrs) do
     song
     |> cast(attrs, [
-      :album_artist,
       :artist,
       :title,
       :attribution,
@@ -52,13 +51,13 @@ defmodule LiveBeats.MediaLibrary.Song do
   end
 
   def put_user(%Ecto.Changeset{} = changeset, %Accounts.User{} = user) do
-    put_assoc(changeset, :user, user)
+    put_embed(changeset, :user, user)
   end
 
   def put_stats(%Ecto.Changeset{} = changeset, %LiveBeats.MP3Stat{} = stat) do
     changeset
     |> put_duration(stat.duration)
-    |> Ecto.Changeset.put_change(:mp3_filesize, stat.size)
+    |> put_mp3(stat)
   end
 
   defp put_duration(%Ecto.Changeset{} = changeset, duration) when is_integer(duration) do
@@ -71,18 +70,16 @@ defmodule LiveBeats.MediaLibrary.Song do
     )
   end
 
-  def put_mp3_path(%Ecto.Changeset{} = changeset) do
-    if changeset.valid? do
-      filename = Ecto.UUID.generate() <> ".mp3"
-      filepath = LiveBeats.MediaLibrary.local_filepath(filename)
+  def put_mp3(%Ecto.Changeset{} = changeset, %MP3Stat{} = stat) do
+    filename = Ecto.UUID.generate() <> ".mp3"
+    filepath = LiveBeats.MediaLibrary.local_filepath(filename)
 
-      changeset
-      |> Ecto.Changeset.put_change(:mp3_filename, filename)
-      |> Ecto.Changeset.put_change(:mp3_filepath, filepath)
-      |> Ecto.Changeset.put_change(:mp3_url, mp3_url(filename))
-    else
-      changeset
-    end
+    Ecto.Changeset.put_embed(changeset, :mp3, %{
+      url: mp3_url(filename),
+      filename: filename,
+      filepath: filepath,
+      filesize: stat.size
+    })
   end
 
   def put_server_ip(%Ecto.Changeset{} = changeset) do

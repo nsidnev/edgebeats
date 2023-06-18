@@ -7,47 +7,74 @@ defmodule LiveBeats.MediaLibraryFixtures do
   alias LiveBeats.Accounts.User
   alias LiveBeats.MediaLibrary.Song
 
+  @args ~w(
+    title
+    attribution
+    artist
+    duration
+    position
+    status
+    server_ip
+    played_at
+    paused_at
+    date_recorded
+    date_released
+    user_id
+    mp3_url
+    mp3_filename
+    mp3_filepath
+  )a
+
   @doc """
   Generate a song.
   """
   def song_fixture(attrs \\ %{}) do
     {:ok, server_ip} = EctoNetwork.INET.cast(LiveBeats.config([:files, :server_ip]))
 
-    attrs =
-      Enum.into(attrs, %{
-        album_artist: "some album_artist",
-        artist: "some artist",
-        date_recorded: ~N[2021-10-26 20:11:00],
-        date_released: ~N[2021-10-26 20:11:00],
-        duration: 42,
-        title: "some title",
-        mp3_url: "//example.com/mp3.mp3",
-        mp3_filename: "mp3.mp3",
-        mp3_filepath: "/data/mp3.mp3",
-        server_ip: server_ip,
-        status: :stopped
-      })
+    attrs = Enum.into(attrs, %{})
 
-    callback =
+    args =
+      Map.merge(
+        %{
+          title: "some title",
+          attribution: "",
+          artist: "some artist",
+          duration: Timex.Duration.from_seconds(42),
+          position: nil,
+          status: :stopped,
+          server_ip: server_ip,
+          played_at: nil,
+          paused_at: nil,
+          date_recorded: ~N[2021-10-26 20:11:00],
+          date_released: ~N[2021-10-26 20:11:00],
+          user_id: nil,
+          mp3_url: "//example.com/mp3.mp3",
+          mp3_filename: "mp3.mp3",
+          mp3_filepath: "/data/mp3.mp3",
+          mp3_filesize: 1
+        },
+        Map.take(attrs, @args)
+      )
+
+    {client, args} =
       case attrs do
-        %{user: %User{id: id}} when is_binary(id) ->
-          &LiveBeats.EdgeDB.Tests.insert_song_with_user/1
+        %{user: %User{id: id}} ->
+          {EdgeDB.with_globals(LiveBeats.EdgeDB, %{"current_user_id" => id}),
+           Map.put(args, :user_id, id)}
 
         _other ->
-          &LiveBeats.EdgeDB.Tests.insert_song/1
+          {LiveBeats.EdgeDB, args}
       end
 
-    {:ok, song} =
-      Song
-      |> struct!(attrs)
-      |> EdgeDBEcto.insert(callback, keep: [:inserted_at, :updated_at])
+    {:ok, song} = Tests.EdgeDB.InsertSong.query(client, args)
+    song = Song.from_edgedb(song)
 
     case attrs do
-      %{user: %User{}} ->
-        song
+      %{user: %User{} = user} ->
+        %{song | user: user}
 
       _other ->
-        %{song | user: nil}
+        %{song | user: %User{}}
     end
   end
 end

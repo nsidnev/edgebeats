@@ -55,15 +55,27 @@ defmodule LiveBeatsWeb.ProfileLive.UploadFormComponent do
     if pending_stats?(socket) do
       {:noreply, socket}
     else
-      case MediaLibrary.import_songs(current_user, changesets, &consume_entry(socket, &1, &2)) do
+      case MediaLibrary.import_songs(
+             socket.assigns.edgedb,
+             current_user,
+             changesets,
+             &consume_entry(socket, &1, &2)
+           ) do
         {:ok, songs} ->
           {:noreply,
            socket
            |> put_flash(:info, "#{map_size(songs)} song(s) uploaded")
            |> push_patch(to: profile_path(current_user))}
 
-        {:error, {failed_op, reason}} ->
-          {:noreply, put_error(socket, {failed_op, reason})}
+        {:error, %EdgeDB.Error{type: EdgeDB.ConstraintViolationError}} ->
+          {:noreply,
+           put_error(
+             socket,
+             {"could not upload song", "the song in your playlist should not be duplicated"}
+           )}
+
+        {:error, %EdgeDB.Error{} = error} ->
+          {:noreply, put_error(socket, error)}
       end
     end
   end
@@ -171,7 +183,13 @@ defmodule LiveBeatsWeb.ProfileLive.UploadFormComponent do
   defp file_error(%{kind: %Ecto.Changeset{}} = assigns),
     do: ~H|<%= @label %>: <%= translate_changeset_errors(@kind) %>|
 
+  defp file_error(%{kind: %EdgeDB.Error{}} = assigns),
+    do: ~H|Something went wrong|
+
   defp file_error(%{kind: {msg, opts}} = assigns) when is_binary(msg) and is_list(opts),
+    do: ~H|<%= @label %>: <%= translate_error(@kind) %>|
+
+  defp file_error(%{kind: msg} = assigns) when is_binary(msg),
     do: ~H|<%= @label %>: <%= translate_error(@kind) %>|
 
   defp put_stats(socket, entry_ref, %MP3Stat{} = stat) do
@@ -222,5 +240,9 @@ defmodule LiveBeatsWeb.ProfileLive.UploadFormComponent do
 
   defp put_error(socket, {label, msg}) do
     update(socket, :error_messages, &(Enum.take([{label, msg} | &1], 10) |> Enum.reverse()))
+  end
+
+  defp put_error(socket, error) do
+    update(socket, :error_messages, &(Enum.take([{nil, error} | &1], 10) |> Enum.reverse()))
   end
 end

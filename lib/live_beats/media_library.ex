@@ -3,8 +3,6 @@ defmodule LiveBeats.MediaLibrary do
   The MediaLibrary context.
   """
 
-  alias Ecto.Multi
-
   alias LiveBeats.{
     Accounts,
     MP3Stat
@@ -12,16 +10,16 @@ defmodule LiveBeats.MediaLibrary do
 
   alias LiveBeats.MediaLibrary.{
     Events,
-    Genre,
     Profile,
     Song
   }
+
+  alias LiveBeats.EdgeDB.MediaLibrary, as: MediaLibraryQueries
 
   require Logger
 
   @pubsub LiveBeats.PubSub
   @auto_next_threshold_seconds 5
-  @max_songs 30
 
   defdelegate stopped?(song), to: Song
   defdelegate playing?(song), to: Song
@@ -62,97 +60,58 @@ defmodule LiveBeats.MediaLibrary do
     user.id == song.user.id
   end
 
-  def play_song(%Song{id: id}) do
-    play_song(id)
+  def play_song(client \\ LiveBeats.EdgeDB, song)
+
+  def play_song(client, %Song{id: id}) do
+    play_song(client, id)
   end
 
-  def play_song(id) do
-    song = get_song!(id)
+  def play_song(client, id) do
+    playing_song =
+      client
+      |> MediaLibraryQueries.PlaySong.query!(song_id: id)
+      |> Song.from_edgedb()
 
-    {:ok, %{now_playing: new_song}} =
-      Multi.new()
-      |> Multi.update_all(
-        :now_stopped,
-        fn %{__conn__: conn} ->
-          fn ->
-            LiveBeats.EdgeDB.MediaLibrary.stop_song([user_id: song.user.id], edgedb: [conn: conn])
-          end
-        end,
-        []
-      )
-      |> Multi.update_all(
-        :now_playing,
-        fn %{__conn__: conn} ->
-          fn ->
-            LiveBeats.EdgeDB.MediaLibrary.play_song([id: song.id], edgedb: [conn: conn])
-          end
-        end,
-        []
-      )
-      |> LiveBeats.EdgeDB.transaction()
-
-    elapsed = elapsed_playback(new_song)
-
-    broadcast!(song.user.id, %Events.Play{song: song, elapsed: elapsed})
-
-    new_song
+    elapsed = elapsed_playback(playing_song)
+    broadcast!(playing_song.user.id, %Events.Play{song: playing_song, elapsed: elapsed})
+    playing_song
   end
 
-  def pause_song(%Song{} = song) do
-    {:ok, _} =
-      Multi.new()
-      |> Multi.update_all(
-        :now_stopped,
-        fn %{__conn__: conn} ->
-          fn ->
-            LiveBeats.EdgeDB.MediaLibrary.stop_song([user_id: song.user.id], edgedb: [conn: conn])
-          end
-        end,
-        []
-      )
-      |> Multi.update_all(
-        :now_paused,
-        fn %{__conn__: conn} ->
-          fn ->
-            LiveBeats.EdgeDB.MediaLibrary.pause_song([id: song.id], edgedb: [conn: conn])
-          end
-        end,
-        []
-      )
-      |> LiveBeats.EdgeDB.transaction()
-
+  def pause_song(client \\ LiveBeats.EdgeDB, %Song{} = song) do
+    MediaLibraryQueries.PauseSong.query!(client, song_id: song.id)
     broadcast!(song.user.id, %Events.Pause{song: song})
   end
 
-  def play_next_song_auto(%Profile{} = profile) do
-    song = get_current_active_song(profile) || get_first_song(profile)
+  def play_next_song_auto(client \\ LiveBeats.EdgeDB, %Profile{} = profile) do
+    song = get_current_active_song(client, profile) || get_first_song(client, profile)
 
-    if song && elapsed_playback(song) >= song.duration - @auto_next_threshold_seconds do
-      song
-      |> get_next_song(profile)
-      |> play_song()
-    end
-  end
-
-  def play_prev_song(%Profile{} = profile) do
-    song = get_current_active_song(profile) || get_first_song(profile)
-
-    if prev_song = get_prev_song(song, profile) do
-      play_song(prev_song)
-    end
-  end
-
-  def play_next_song(%Profile{} = profile) do
-    song = get_current_active_song(profile) || get_first_song(profile)
-
-    if next_song = get_next_song(song, profile) do
+    if song &&
+         elapsed_playback(song) >=
+           Timex.Duration.to_seconds(song.duration) - @auto_next_threshold_seconds do
+      next_song = get_next_song(client, song, profile)
       play_song(next_song)
     end
   end
 
+  def play_prev_song(client \\ LiveBeats.EdgeDB, %Profile{} = profile) do
+    song = get_current_active_song(client, profile) || get_first_song(client, profile)
+
+    if prev_song = get_prev_song(client, song, profile) do
+      play_song(client, prev_song)
+    end
+  end
+
+  def play_next_song(client \\ LiveBeats.EdgeDB, %Profile{} = profile) do
+    song = get_current_active_song(client, profile) || get_first_song(client, profile)
+
+    if next_song = get_next_song(client, song, profile) do
+      play_song(client, next_song)
+    end
+  end
+
   def store_mp3(%Song{} = song, tmp_path) do
-    File.mkdir_p!(Path.dirname(song.mp3_filepath))
-    File.cp!(tmp_path, song.mp3_filepath)
+    File.mkdir_p!(Path.dirname(song.mp3.filepath))
+    File.cp!(tmp_path, song.mp3.filepath)
   end
 
   def put_stats(%Ecto.Changeset{} = changeset, %MP3Stat{} = stat) do
@@ -165,39 +124,30 @@ defmodule LiveBeats.MediaLibrary do
     end
   end
 
-  def import_songs(%Accounts.User{} = user, changesets, consume_file)
+  def import_songs(client \\ LiveBeats.EdgeDB, %Accounts.User{}, changesets, consume_file)
       when is_map(changesets) and is_function(consume_file, 2) do
-    # refetch user for fresh song count
-    user = Accounts.get_user!(user.id)
-
-    starting_position = LiveBeats.EdgeDB.MediaLibrary.get_user_songs_count(user_id: user.id) - 1
-
-    multi =
-      changesets
-      |> Enum.with_index()
-      |> Enum.reduce(Ecto.Multi.new(), fn {{ref, chset}, i}, acc ->
-        chset =
+    songs =
+      Enum.map(changesets, fn {ref, chset} ->
+        song =
           chset
-          |> Song.put_user(user)
-          |> Song.put_mp3_path()
           |> Song.put_server_ip()
-          |> Ecto.Changeset.put_change(:position, starting_position + i + 1)
+          |> changeset_to_map()
+          |> Map.put(:ref, ref)
 
-        Ecto.Multi.insert(acc, {:song, ref}, chset,
-          callback: &LiveBeats.EdgeDB.MediaLibrary.insert_song_for_user/2
-        )
-      end)
-      |> Ecto.Multi.run(:valid_songs_count, fn _conn, changes ->
-        new_songs_count = Enum.count(changes, &match?({{:song, _ref}, _}, &1))
-        validate_songs_limit(user.songs_count, new_songs_count)
+        Map.put(song, :server_ip, server_ip_to_json(song.server_ip))
       end)
 
-    case LiveBeats.EdgeDB.transaction(multi) do
-      {:ok, results} ->
+    case MediaLibraryQueries.StoreSongsForImport.query(client, songs: songs) do
+      {:ok,
+       %{
+         user: user,
+         songs: songs
+       }} ->
+        user = Accounts.User.from_edgedb(user)
+
         songs =
-          results
-          |> Enum.filter(&match?({{:song, _ref}, _}, &1))
-          |> Enum.map(fn {{:song, ref}, song} ->
+          Enum.map(songs, fn %{song: song, ref: ref} ->
+            song = Song.from_edgedb(song)
             consume_file.(ref, fn tmp_path -> store_mp3(song, tmp_path) end)
             {ref, song}
           end)
@@ -206,20 +156,13 @@ defmodule LiveBeats.MediaLibrary do
 
         {:ok, Enum.into(songs, %{})}
 
-      {:error, failed_op, failed_val, _changes} ->
-        failed_op =
-          case failed_op do
-            {:song, _number} -> "Invalid song (#{failed_val.changes.title})"
-            :is_songs_count_updated? -> :invalid
-            failed_op -> failed_op
-          end
-
-        {:error, {failed_op, failed_val}}
+      {:error, error} ->
+        {:error, error}
     end
   end
 
   defp broadcast_imported(%Accounts.User{} = user, songs) do
-    songs = Enum.map(songs, fn {_ref, song} -> song end)
+    songs = Enum.map(songs, &elem(&1, 1))
     broadcast!(user.id, %Events.SongsImported{user_id: user.id, songs: songs})
   end
 
@@ -230,27 +173,26 @@ defmodule LiveBeats.MediaLibrary do
     end
   end
 
-  def create_genre(attrs \\ %{}) do
-    %Genre{}
-    |> Genre.changeset(attrs)
-    |> EdgeDBEcto.insert(&LiveBeats.EdgeDB.MediaLibrary.insert_genre/1)
+  def list_profile_songs(client \\ LiveBeats.EdgeDB, %Profile{} = profile, limit \\ 100) do
+    client
+    |> MediaLibraryQueries.ListProfileSongs.query!(
+      user_id: profile.user_id,
+      limit: limit
+    )
+    |> Enum.map(&Song.from_edgedb/1)
   end
 
-  def list_genres do
-    LiveBeats.EdgeDB.MediaLibrary.list_genres()
-  end
-
-  def list_profile_songs(%Profile{} = profile, limit \\ 100) do
-    LiveBeats.EdgeDB.MediaLibrary.list_profile_songs(user_id: profile.user_id, limit: limit)
-  end
-
-  def list_active_profiles(opts) do
-    LiveBeats.EdgeDB.MediaLibrary.list_active_profiles(limit: Keyword.fetch!(opts, :limit))
+  def list_active_profiles(client \\ LiveBeats.EdgeDB, opts) do
+    client
+    |> MediaLibraryQueries.ListActiveProfiles.query!(limit: Keyword.fetch!(opts, :limit))
+    |> Enum.map(&Accounts.User.from_edgedb/1)
     |> Enum.map(&get_profile!/1)
   end
 
-  def get_current_active_song(%Profile{user_id: user_id}) do
-    LiveBeats.EdgeDB.MediaLibrary.get_current_active_song(user_id: user_id)
+  def get_current_active_song(client \\ LiveBeats.EdgeDB, %Profile{user_id: user_id}) do
+    client
+    |> MediaLibraryQueries.GetCurrentActiveSong.query!(user_id: user_id)
+    |> Song.from_edgedb()
   end
 
   def get_profile!(%Accounts.User{} = user) do
@@ -285,202 +227,99 @@ defmodule LiveBeats.MediaLibrary do
     end
   end
 
-  def get_song!(id), do: LiveBeats.EdgeDB.MediaLibrary.get_song(id: id)
-
-  def get_first_song(%Profile{user_id: user_id}) do
-    LiveBeats.EdgeDB.MediaLibrary.get_first_song(user_id: user_id)
+  def get_song!(client \\ LiveBeats.EdgeDB, id) do
+    client
+    |> MediaLibraryQueries.GetSong.query!(song_id: id)
+    |> Song.from_edgedb()
   end
 
-  def get_last_song(%Profile{user_id: user_id}) do
-    LiveBeats.EdgeDB.MediaLibrary.get_last_song(user_id: user_id)
+  def get_first_song(client \\ LiveBeats.EdgeDB, %Profile{user_id: user_id}) do
+    client
+    |> MediaLibraryQueries.GetFirstSong.query!(user_id: user_id)
+    |> Song.from_edgedb()
   end
 
-  def get_next_song(%Song{} = song, %Profile{} = profile) do
+  def get_last_song(client \\ LiveBeats.EdgeDB, %Profile{user_id: user_id}) do
+    client
+    |> MediaLibraryQueries.GetLastSong.query!(user_id: user_id)
+    |> Song.from_edgedb()
+  end
+
+  def get_next_song(client \\ LiveBeats.EdgeDB, %Song{} = song, %Profile{} = profile) do
     next =
-      LiveBeats.EdgeDB.MediaLibrary.get_next_song(
-        id: song.id,
-        user_id: profile.user_id,
-        position: song.position
-      )
+      client
+      |> MediaLibraryQueries.GetNextSong.query!(song_id: song.id)
+      |> Song.from_edgedb()
 
-    next || get_first_song(profile)
+    next || get_first_song(client, profile)
   end
 
-  def get_prev_song(%Song{} = song, %Profile{} = profile) do
+  def get_prev_song(client \\ LiveBeats.EdgeDB, %Song{} = song, %Profile{} = profile) do
     prev =
-      LiveBeats.EdgeDB.MediaLibrary.get_prev_song(
-        id: song.id,
-        user_id: profile.user_id,
-        position: song.position
-      )
+      client
+      |> MediaLibraryQueries.GetPreviousSong.query!(song_id: song.id)
+      |> Song.from_edgedb()
 
-    prev || get_last_song(profile)
+    prev || get_last_song(client, profile)
   end
 
-  def update_song_position(%Song{} = song, new_index) do
-    old_index = song.position
-
-    multi =
-      Ecto.Multi.new()
-      |> Ecto.Multi.run(:index, fn _repo, %{__conn__: conn} ->
-        case LiveBeats.EdgeDB.MediaLibrary.get_user_songs_count([user_id: song.user_id],
-               edgedb: [conn: conn]
-             ) do
-          count when new_index < count -> {:ok, new_index}
-          count -> {:ok, count - 1}
-        end
-      end)
-      |> Ecto.Multi.update_all(
-        :dec_positions,
-        fn %{__conn__: conn, index: new_index} ->
-          fn ->
-            LiveBeats.EdgeDB.MediaLibrary.decrease_songs_position_after_update(
-              [
-                id: song.id,
-                user_id: song.user_id,
-                old_position: old_index,
-                new_position: new_index
-              ],
-              edgedb: [conn: conn]
-            )
-          end
-        end,
-        []
-      )
-      |> Ecto.Multi.update_all(
-        :inc_positions,
-        fn %{__conn__: conn, index: new_index} ->
-          fn ->
-            LiveBeats.EdgeDB.MediaLibrary.increase_songs_position_after_update(
-              [
-                id: song.id,
-                user_id: song.user_id,
-                old_position: old_index,
-                new_position: new_index
-              ],
-              edgedb: [conn: conn]
-            )
-          end
-        end,
-        []
-      )
-      |> Ecto.Multi.update_all(
-        :position,
-        fn %{__conn__: conn, index: new_index} ->
-          fn ->
-            LiveBeats.EdgeDB.MediaLibrary.set_song_position(
-              [id: song.id, position: new_index],
-              edgedb: [conn: conn]
-            )
-          end
-        end,
-        []
+  def update_song_position(client \\ LiveBeats.EdgeDB, %Song{} = song, new_position) do
+    new_position =
+      MediaLibraryQueries.UpdateSongPosition.query!(client,
+        song_id: song.id,
+        new_position: new_position
       )
 
-    case LiveBeats.EdgeDB.transaction(multi) do
-      {:ok, _} ->
-        broadcast!(song.user_id, %Events.NewPosition{song: %Song{song | position: new_index}})
-        :ok
-
-      {:error, failed_op, _failed_val, _changes} ->
-        {:error, failed_op}
-    end
+    broadcast!(song.user.id, %Events.NewPosition{song: %Song{song | position: new_position}})
   end
 
-  def update_song(%Song{} = song, attrs) do
-    song
-    |> Song.changeset(attrs)
-    |> EdgeDBEcto.update(&LiveBeats.EdgeDB.MediaLibrary.update_song/1)
-  end
-
-  def delete_song(%Song{} = song) do
+  def delete_song(client \\ LiveBeats.EdgeDB, %Song{} = song) do
+    MediaLibraryQueries.DeleteSong.query!(client, song_id: song.id)
     delete_song_file(song)
-    old_index = song.position
-
-    multi_result =
-      Ecto.Multi.new()
-      |> Ecto.Multi.delete(:delete, song, callback: &LiveBeats.EdgeDB.MediaLibrary.delete_song/2)
-      |> Ecto.Multi.update_all(
-        :dec_positions,
-        fn %{__conn__: conn} ->
-          fn ->
-            LiveBeats.EdgeDB.MediaLibrary.decrease_songs_position_after_delete(
-              [
-                id: song.id,
-                user_id: song.user_id,
-                old_position: old_index
-              ],
-              edgedb: [conn: conn]
-            )
-          end
-        end,
-        []
-      )
-      |> LiveBeats.EdgeDB.transaction()
-
-    case multi_result do
-      {:ok, _} ->
-        broadcast!(song.user_id, %Events.SongDeleted{song: song})
-        :ok
-
-      other ->
-        other
-    end
+    broadcast!(song.user.id, %Events.SongDeleted{song: song})
   end
 
-  def expire_songs_older_than(count, interval) when interval in [:month, :day, :second] do
+  def expire_songs_older_than(client \\ LiveBeats.EdgeDB, count, interval)
+      when interval in [:month, :day, :second] do
     admin_usernames = LiveBeats.config([:files, :admin_usernames])
     server_ip = LiveBeats.config([:files, :server_ip])
 
-    multi_result =
-      Ecto.Multi.new()
-      |> Ecto.Multi.delete_all(
-        :delete_expired_songs,
-        fn %{__conn__: conn} ->
-          step =
-            case interval do
-              :month ->
-                :months
+    step =
+      case interval do
+        :month ->
+          :months
 
-              :day ->
-                :days
+        :day ->
+          :days
 
-              :second ->
-                :seconds
-            end
+        :second ->
+          :seconds
+      end
 
-          interval =
-            Timex.Interval.new(from: DateTime.utc_now(), until: [{step, count}])
-            |> Timex.Interval.duration(:duration)
+    interval =
+      Timex.Interval.new(from: DateTime.utc_now(), until: [{step, count}])
+      |> Timex.Interval.duration(:duration)
 
-          fn ->
-            LiveBeats.EdgeDB.MediaLibrary.delete_expired_songs(
-              [interval: interval, server_ip: server_ip, admin_usernames: admin_usernames],
-              edgedb: [conn: conn]
-            )
-          end
-        end
+    deleted_songs =
+      client
+      |> MediaLibraryQueries.DeleteExpiredSongs.query!(
+        interval: interval,
+        server_ip: server_ip,
+        admin_usernames: admin_usernames
       )
-      |> LiveBeats.EdgeDB.transaction()
+      |> Enum.map(&Song.from_edgedb/1)
 
-    case multi_result do
-      {:ok, transaction_result} ->
-        deleted_songs = transaction_result.delete_expired_songs
-        Enum.each(deleted_songs, &delete_song_file/1)
-
-      error ->
-        error
-    end
+    Enum.each(deleted_songs, &delete_song_file/1)
   end
 
   defp delete_song_file(song) do
-    case File.rm(song.mp3_filepath) do
+    case File.rm(song.mp3.filepath) do
       :ok ->
         :ok
 
       {:error, reason} ->
         Logger.info(
-          "unable to delete song #{song.id} at #{song.mp3_filepath}, got: #{inspect(reason)}"
+          "unable to delete song #{song.id} at #{song.mp3.filepath}, got: #{inspect(reason)}"
         )
     end
   end
@@ -491,7 +330,7 @@ defmodule LiveBeats.MediaLibrary do
     Song.changeset(song, attrs)
   end
 
-  @keep_changes [:duration, :mp3_filesize, :mp3_filepath]
+  @keep_changes [:duration, :mp3]
   def change_song(%Ecto.Changeset{} = prev_changeset, attrs) do
     %Song{}
     |> change_song(attrs)
@@ -504,11 +343,19 @@ defmodule LiveBeats.MediaLibrary do
 
   defp topic(user_id) when is_binary(user_id), do: "profile:#{user_id}"
 
-  defp validate_songs_limit(user_songs, new_songs_count) do
-    if user_songs + new_songs_count <= @max_songs do
-      {:ok, new_songs_count}
-    else
-      {:error, :songs_limit_exceeded}
-    end
+  defp changeset_to_map(%Ecto.Changeset{} = changeset) do
+    Enum.into(changeset.changes, %{}, fn
+      {key, %Ecto.Changeset{} = changeset} ->
+        {key, changeset_to_map(changeset)}
+
+      entry ->
+        entry
+    end)
+  end
+
+  defp server_ip_to_json(%Postgrex.INET{} = inet) do
+    inet
+    |> Postgrex.DefaultTypes.encode_value(Postgrex.Extensions.INET)
+    |> Base.encode64()
   end
 end

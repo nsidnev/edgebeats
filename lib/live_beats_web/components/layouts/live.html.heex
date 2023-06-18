@@ -236,10 +236,14 @@
     >
       <span id="ping" phx-hook="Ping"></span>
       <%= if @region do %>
-        <img
-          class="inline w-5 h-5 absolute right-0"
-          src={"https://fly.io/ui/images/#{@region}.svg"}
-        />
+        <span>[<%= @region %>]</span>
+        <!--
+          images can't be accessed anymore
+          <img
+            class="inline w-5 h-5 absolute right-0"
+            src={"https://fly.io/ui/images/#{@region}.svg"}
+          />
+        -->
       <% end %>
     </div>
   </div>

@@ -26,7 +26,7 @@ defmodule LiveBeatsWeb.OAuthCallbackController do
         |> redirect(to: "/")
 
       {:error, reason} ->
-        Logger.debug("failed GitHub exchange #{inspect(reason)}")
+        Logger.error("failed GitHub exchange #{inspect(reason)}")
 
         conn
         |> put_flash(:error, "We were unable to contact GitHub. Please try again later")

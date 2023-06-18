@@ -40,39 +40,34 @@ defmodule LiveBeatsWeb.GithubCallbackTest do
   test "callback with valid token", %{conn: conn} do
     params = %{"code" => "66e1c4202275d071eced", "state" => "valid"}
 
-    assert Accounts.get_user_by_email("chris@local.test") == nil
+    assert Accounts.get_user_by_username("chrismccord") == nil
 
     conn = get(conn, ~p"/oauth/callbacks/github?#{params}")
 
     assert redirected_to(conn, 302) == "/chrismccord"
-    assert %Accounts.User{} = user = Accounts.get_user_by_email("chris@local.test")
+    assert %Accounts.User{} = user = Accounts.get_user_by_username!("chrismccord")
     assert user.name == "Chris"
   end
 
   test "callback with invalid exchange response", %{conn: conn} do
     params = %{"code" => "66e1c4202275d071eced", "state" => "invalid"}
-    assert Accounts.list_users(limit: 100) == []
-
     conn = get(conn, ~p"/oauth/callbacks/github?#{params}")
 
     assert Phoenix.Flash.get(conn.assigns.flash, :error) ==
              "We were unable to contact GitHub. Please try again later"
 
     assert redirected_to(conn, 302) == "/"
-    assert Accounts.list_users(limit: 100) == []
+    refute Accounts.get_user_by_username("chrismccord")
   end
 
   test "callback with failed token exchange", %{conn: conn} do
     params = %{"code" => "66e1c4202275d071eced", "state" => "failed"}
-
-    assert Accounts.list_users(limit: 100) == []
-
     conn = get(conn, ~p"/oauth/callbacks/github?#{params}")
 
     assert Phoenix.Flash.get(conn.assigns.flash, :error) ==
              "We were unable to contact GitHub. Please try again later"
 
     assert redirected_to(conn, 302) == "/"
-    assert Accounts.list_users(limit: 100) == []
+    refute Accounts.get_user_by_username("chrismccord")
   end
 end

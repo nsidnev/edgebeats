@@ -1,35 +1,25 @@
-# edgedb = :query_required_single!
-# mapper = LiveBeats.MediaLibrary.Song
-
-with song := (
-  update Song
-  filter .id = <uuid>$id
-  set {
-    status := SongStatus.Playing,
-    played_at := datetime_current(),
-    updated_at := cal::to_local_datetime(datetime_current(), 'UTC'),
-  }
-)
-select song {
-  title,
-  attribution,
-  album_artist,
-  artist,
-  duration,
-  position,
-  status,
-  mp3_url,
-  mp3_filename,
-  mp3_filepath,
-  mp3_filesize,
-  server_ip,
-  played_at,
-  paused_at,
-  date_recorded,
-  date_released,
-  inserted_at,
-  updated_at,
+with
+  stopped_songs := (
+    update Song
+    filter
+      .status in {SongStatus.playing, SongStatus.paused} and .id != <uuid>$song_id
+    set {
+      status := SongStatus.stopped
+    }
+  ),
+  playing_song := (
+    update Song
+    filter .id = <uuid>$song_id
+    set {
+      status := SongStatus.playing
+    }
+  )
+select playing_song {
+  *,
+  mp3: {
+    *
+  },
   user: {
-    id
+    id,
   }
 }

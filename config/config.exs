@@ -48,6 +48,20 @@ config :logger, :console,
 # Use Jason for JSON parsing in Phoenix
 config :phoenix, :json_library, Jason
 
+config :edgedb,
+  generation: [
+    [
+      queries_path: "priv/edgedb/edgeql/",
+      output_path: "lib/live_beats/edgedb/queries",
+      module_prefix: LiveBeats.EdgeDB
+    ],
+    [
+      queries_path: "test/support/edgeql/",
+      output_path: "test/support/edgeql/",
+      module_prefix: Tests.EdgeDB
+    ]
+  ]
+
 # Import environment specific config. This must remain at the bottom
 # of this file so it overrides the configuration defined above.
 import_config "#{config_env()}.exs"

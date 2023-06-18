@@ -11,6 +11,7 @@ defmodule LiveBeatsWeb.Router do
     plug :put_root_layout, {LiveBeatsWeb.Layouts, :root}
     plug :protect_from_forgery
     plug :put_secure_browser_headers
+    plug :set_edgedb_client
   end
 
   pipeline :api do
@@ -58,5 +59,9 @@ defmodule LiveBeatsWeb.Router do
       live "/:profile_username", ProfileLive, :show
       live "/profile/settings", SettingsLive, :edit
     end
+  end
+
+  defp set_edgedb_client(conn, _params) do
+    assign(conn, :edgedb, LiveBeats.EdgeDB)
   end
 end

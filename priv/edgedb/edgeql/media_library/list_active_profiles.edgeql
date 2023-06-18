@@ -1,12 +1,9 @@
-# edgedb = :query!
-# mapper = LiveBeats.Accounts.User
-
-with song := (
+with songs := (
   select Song
-  filter .status = SongStatus.Playing
+  filter .status = SongStatus.playing
   order by .updated_at desc
 )
-select song.user {
+select songs.user {
   id,
   username,
   profile_tagline,

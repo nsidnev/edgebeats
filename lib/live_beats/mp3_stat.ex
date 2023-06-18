@@ -24,9 +24,18 @@ defmodule LiveBeats.MP3Stat do
   defstruct duration: 0, size: 0, path: nil, title: nil, artist: nil, tags: nil
 
   def to_mmss(duration) when is_integer(duration) do
-    hours = div(duration, 60 * 60)
-    minutes = div(duration - hours * 60 * 60, 60)
-    seconds = rem(duration - hours * 60 * 60 - minutes * 60, 60)
+    duration
+    |> Timex.Duration.from_seconds()
+    |> to_mmss()
+  end
+
+  def to_mmss(%Timex.Duration{} = duration) do
+    minutes = Timex.Duration.to_minutes(duration, truncate: true)
+
+    seconds =
+      duration
+      |> Timex.Duration.diff(Timex.Duration.from_minutes(minutes))
+      |> Timex.Duration.to_seconds(truncate: true)
 
     Enum.map_join([minutes, seconds], ":", fn count ->
       String.pad_leading("#{count}", 2, ["0"])

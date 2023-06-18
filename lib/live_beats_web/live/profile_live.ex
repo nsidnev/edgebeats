@@ -5,6 +5,8 @@ defmodule LiveBeatsWeb.ProfileLive do
   alias LiveBeatsWeb.{LayoutComponent, Presence}
   alias LiveBeatsWeb.ProfileLive.UploadFormComponent
 
+  require Logger
+
   @max_presences 20
 
   def render(assigns) do
@@ -141,9 +143,8 @@ defmodule LiveBeatsWeb.ProfileLive do
   def mount(%{"profile_username" => profile_username}, _session, socket) do
     %{current_user: current_user} = socket.assigns
 
-    profile =
-      Accounts.get_user_by!(username: profile_username)
-      |> MediaLibrary.get_profile!()
+    user = Accounts.get_user_by_username!(socket.assigns.edgedb, profile_username)
+    profile = MediaLibrary.get_profile!(user)
 
     if connected?(socket) do
       MediaLibrary.subscribe_to_profile(profile)
@@ -152,7 +153,7 @@ defmodule LiveBeatsWeb.ProfileLive do
     end
 
     active_song_id =
-      if song = MediaLibrary.get_current_active_song(profile) do
+      if song = MediaLibrary.get_current_active_song(socket.assigns.edgedb, profile) do
         song.id
       end
 
@@ -165,7 +166,7 @@ defmodule LiveBeatsWeb.ProfileLive do
           nil
       end
 
-    songs = MediaLibrary.list_profile_songs(profile, 50)
+    songs = MediaLibrary.list_profile_songs(socket.assigns.edgedb, profile, 50)
 
     socket =
       socket
@@ -180,6 +181,20 @@ defmodule LiveBeatsWeb.ProfileLive do
       |> assign_presences()
 
     {:ok, socket, temporary_assigns: [presences: %{}]}
+  rescue
+    e in EdgeDB.Error ->
+      case e do
+        %EdgeDB.Error{type: EdgeDB.CardinalityViolationError} ->
+          socket =
+            socket
+            |> put_flash(:error, e.message)
+            |> redirect(to: profile_path(socket.assigns.current_user))
+
+          {:ok, socket}
+
+        _other ->
+          reraise e, __STACKTRACE__
+      end
   end
 
   def handle_params(params, _url, socket) do
@@ -188,15 +203,15 @@ defmodule LiveBeatsWeb.ProfileLive do
   end
 
   def handle_event("play_or_pause", %{"id" => id}, socket) do
-    song = MediaLibrary.get_song!(id)
+    song = MediaLibrary.get_song!(socket.assigns.edgedb, id)
     can_playback? = MediaLibrary.can_control_playback?(socket.assigns.current_user, song)
 
     cond do
       can_playback? and socket.assigns.active_song_id == id and MediaLibrary.playing?(song) ->
-        MediaLibrary.pause_song(song)
+        MediaLibrary.pause_song(socket.assigns.edgedb, song)
 
       can_playback? ->
-        MediaLibrary.play_song(id)
+        MediaLibrary.play_song(socket.assigns.edgedb, id)
 
       true ->
         :noop
@@ -206,10 +221,10 @@ defmodule LiveBeatsWeb.ProfileLive do
   end
 
   def handle_event("delete", %{"id" => id}, socket) do
-    song = MediaLibrary.get_song!(id)
+    song = MediaLibrary.get_song!(socket.assigns.edgedb, id)
 
-    if song.user_id == socket.assigns.current_user.id do
-      :ok = MediaLibrary.delete_song(song)
+    if song.user.id == socket.assigns.current_user.id do
+      :ok = MediaLibrary.delete_song(socket.assigns.edgedb, song)
     end
 
     {:noreply, socket}
@@ -217,10 +232,10 @@ defmodule LiveBeatsWeb.ProfileLive do
 
   def handle_event("row_dropped", %{"id" => dom_id, "old" => old_idx, "new" => new_idx}, socket) do
     "songs-" <> id = dom_id
-    song = MediaLibrary.get_song!(id)
+    song = MediaLibrary.get_song!(socket.assigns.edgedb, id)
 
-    if song.user_id == socket.assigns.current_user.id and song.position == old_idx do
-      :ok = MediaLibrary.update_song_position(song, new_idx)
+    if song.user.id == socket.assigns.current_user.id and song.position == old_idx do
+      :ok = MediaLibrary.update_song_position(socket.assigns.edgedb, song, new_idx)
       {:noreply, socket}
     else
       {:noreply, socket}
@@ -296,7 +311,7 @@ defmodule LiveBeatsWeb.ProfileLive do
   def handle_info({Accounts, _}, socket), do: {:noreply, socket}
 
   defp stop_song(socket, song_id) do
-    song = MediaLibrary.get_song!(song_id)
+    song = MediaLibrary.get_song!(socket.assigns.edgedb, song_id)
 
     socket =
       if socket.assigns.active_song_id == song_id do
@@ -358,7 +373,8 @@ defmodule LiveBeatsWeb.ProfileLive do
       patch: profile_path(socket.assigns.current_user),
       song: socket.assigns.song,
       title: socket.assigns.page_title,
-      current_user: socket.assigns.current_user
+      current_user: socket.assigns.current_user,
+      edgedb: socket.assigns.edgedb
     })
 
     socket

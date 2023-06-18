@@ -1,34 +1,17 @@
-# edgedb = :query_single!
-# mapper = LiveBeats.MediaLibrary.Song
-
-with current_song := (select Song filter .id = <uuid>$id)
+with current_song := <Song><uuid>$song_id
 select Song {
-  title,
-  attribution,
-  album_artist,
-  artist,
-  duration,
-  position,
-  status,
-  mp3_url,
-  mp3_filename,
-  mp3_filepath,
-  mp3_filesize,
-  server_ip,
-  played_at,
-  paused_at,
-  date_recorded,
-  date_released,
-  inserted_at,
-  updated_at,
+  *,
+  mp3: {
+    *
+  },
   user: {
-    id
+    id,
   }
 }
 filter
-  .user.id = <uuid>$user_id
+  .user = current_song.user
     and
-  .position > <int64>$position
+  .position > current_song.position
 order by
   .position asc
 limit 1
